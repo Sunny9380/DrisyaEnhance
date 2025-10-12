@@ -1,10 +1,32 @@
 import express, { type Request, Response, NextFunction } from "express";
+import session from "express-session";
+import connectPg from "connect-pg-simple";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { pool } from "./db";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Session configuration
+const PgStore = connectPg(session);
+app.use(
+  session({
+    store: new PgStore({
+      pool: pool as any,
+      createTableIfMissing: true,
+    }),
+    secret: process.env.SESSION_SECRET || "drisya-secret-key-change-in-production",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+    },
+  })
+);
 
 app.use((req, res, next) => {
   const start = Date.now();

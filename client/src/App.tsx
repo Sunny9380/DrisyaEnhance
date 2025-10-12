@@ -128,7 +128,7 @@ function AppContent() {
                   </DropdownMenuItem>
                   <DropdownMenuItem 
                     onClick={async () => {
-                      await apiRequest("/api/auth/logout", { method: "POST" });
+                      await apiRequest("POST", "/api/auth/logout");
                       queryClient.clear();
                       setLocation("/");
                     }} 
