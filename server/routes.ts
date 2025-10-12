@@ -6,7 +6,43 @@ import multer from "multer";
 import path from "path";
 import fs from "fs/promises";
 import archiver from "archiver";
+import axios from "axios";
 import { insertUserSchema, insertProcessingJobSchema } from "@shared/schema";
+
+const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || "http://localhost:5001";
+
+// Helper function to process image with Python AI service
+async function processImageWithAI(
+  imagePath: string,
+  backgroundPrompt: string
+): Promise<string> {
+  try {
+    // Read image file
+    const imageBuffer = await fs.readFile(imagePath);
+    const imageBase64 = imageBuffer.toString("base64");
+
+    // Call Python service
+    const response = await axios.post(`${PYTHON_SERVICE_URL}/process`, {
+      image: imageBase64,
+      background_prompt: backgroundPrompt,
+      remove_background: true,
+    }, {
+      timeout: 30000, // 30 second timeout
+    });
+
+    if (!response.data.success) {
+      throw new Error(response.data.error || "Processing failed");
+    }
+
+    // Return processed image as base64
+    return response.data.image;
+  } catch (error: any) {
+    if (error.code === "ECONNREFUSED") {
+      throw new Error("Image processing service is not running. Please start the Python service.");
+    }
+    throw error;
+  }
+}
 
 // Configure multer for file uploads
 const upload = multer({
@@ -104,6 +140,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({
       user: { id: user.id, email: user.email, name: user.name, coinBalance: user.coinBalance, role: user.role },
     });
+  });
+
+  // ============== Admin Routes ==============
+  
+  // Get all users (admin only)
+  app.get("/api/admin/users", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const currentUser = await storage.getUser(req.session.userId);
+      if (currentUser?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const users = await storage.getAllUsers();
+      res.json({ users });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Add coins to user (admin only)
+  app.post("/api/admin/users/:userId/add-coins", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const currentUser = await storage.getUser(req.session.userId);
+      if (currentUser?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { amount, description } = req.body;
+      const targetUserId = req.params.userId;
+
+      if (!amount || amount <= 0) {
+        return res.status(400).json({ message: "Invalid amount" });
+      }
+
+      await storage.addCoinsWithTransaction(targetUserId, amount, {
+        type: "purchase",
+        description: description || `Admin added ${amount} coins`,
+        metadata: { addedBy: req.session.userId },
+      });
+
+      const updatedUser = await storage.getUser(targetUserId);
+      res.json({ user: updatedUser });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
   });
 
   // ============== Template Routes ==============
@@ -229,47 +318,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
           throw error;
         }
 
-        // Start processing (mock - in reality, this would trigger a background job)
-        // For now, we'll just mark it as completed immediately
+        // Start processing with AI service (async background job)
         setTimeout(async () => {
           try {
             // Get all images for this job
             const jobImages = await storage.getJobImages(job.id);
             
-            // Update each image status (mock processing)
-            for (const image of jobImages) {
-              await storage.updateImageStatus(
-                image.id,
-                "completed",
-                image.originalUrl.replace("/uploads/", "/processed/")
-              );
-            }
-
-            // Create zip file
-            const zipFileName = `job-${job.id}.zip`;
-            const zipPath = path.join("uploads", "processed", zipFileName);
+            // Get background prompt from batch settings
+            const backgroundPrompt = job.batchSettings?.backgroundPrompt || 
+              "elegant dark gradient background for product photography";
             
             // Ensure processed directory exists
             await fs.mkdir(path.join("uploads", "processed"), { recursive: true });
+
+            // Process each image with AI
+            for (const image of jobImages) {
+              try {
+                const originalPath = path.join("uploads", path.basename(image.originalUrl));
+                
+                // Process with Python AI service
+                const processedBase64 = await processImageWithAI(originalPath, backgroundPrompt);
+                
+                // Save processed image
+                const processedFileName = `processed-${path.basename(image.originalUrl)}.png`;
+                const processedPath = path.join("uploads", "processed", processedFileName);
+                const processedBuffer = Buffer.from(processedBase64, "base64");
+                await fs.writeFile(processedPath, processedBuffer);
+                
+                // Update image status
+                await storage.updateImageStatus(
+                  image.id,
+                  "completed",
+                  `/uploads/processed/${processedFileName}`
+                );
+              } catch (error) {
+                console.error(`Failed to process image ${image.id}:`, error);
+                await storage.updateImageStatus(image.id, "failed", null);
+              }
+            }
+
+            // Create zip file with processed images
+            const zipFileName = `job-${job.id}.zip`;
+            const zipPath = path.join("uploads", "processed", zipFileName);
 
             const output = require("fs").createWriteStream(zipPath);
             const archive = archiver("zip", { zlib: { level: 9 } });
 
             archive.pipe(output);
 
-            // Add all images to zip
+            // Add all processed images to zip
             for (const image of jobImages) {
-              const imagePath = path.join("uploads", path.basename(image.originalUrl));
-              archive.file(imagePath, { name: `processed-${path.basename(image.originalUrl)}` });
+              if (image.processedUrl) {
+                const imagePath = path.join("uploads", "processed", path.basename(image.processedUrl));
+                try {
+                  archive.file(imagePath, { name: path.basename(image.processedUrl) });
+                } catch (err) {
+                  console.error(`Failed to add ${imagePath} to zip:`, err);
+                }
+              }
             }
 
             await archive.finalize();
 
             // Update job status
+            const completedCount = jobImages.filter(img => img.processedUrl).length;
             await storage.updateProcessingJobStatus(
               job.id,
-              "completed",
-              files.length,
+              completedCount === jobImages.length ? "completed" : "failed",
+              completedCount,
               `/uploads/processed/${zipFileName}`
             );
 
@@ -283,12 +399,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
             }
 
-            console.log(`Job ${job.id} completed`);
+            console.log(`Job ${job.id} completed with ${completedCount}/${jobImages.length} images`);
           } catch (error) {
             console.error("Processing error:", error);
             await storage.updateProcessingJobStatus(job.id, "failed", 0);
           }
-        }, 3000); // Simulate 3 second processing
+        }, 2000); // Start processing after 2 seconds
 
         res.json({ job });
       } catch (error: any) {
