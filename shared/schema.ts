@@ -9,6 +9,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   name: text("name"),
+  phone: text("phone"), // WhatsApp number for admin contact
   coinBalance: integer("coin_balance").notNull().default(0),
   role: text("role").notNull().default("user"), // user, admin
   createdAt: timestamp("created_at").notNull().defaultNow(),
