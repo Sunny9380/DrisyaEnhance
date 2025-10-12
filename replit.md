@@ -58,15 +58,16 @@ Preferred communication style: Simple, everyday language.
 
 **Development Server:** Vite middleware integration for HMR in development, static serving in production
 
-**Storage Layer:** Currently using in-memory storage (`MemStorage` class) with interface-based design for future database migration
+**Storage Layer:** PostgreSQL database with Drizzle ORM (`DbStorage` class) for persistent data storage
 
 **API Design:**
 - RESTful API structure with `/api` prefix
 - Route registration system in `server/routes.ts`
 - Request/response logging middleware
 - Error handling middleware with status code normalization
+- Admin-only routes for user and coin management
 
-**Authentication:** Session-based (infrastructure ready, implementation pending)
+**Authentication:** Session-based authentication with PostgreSQL session storage (fully implemented)
 
 **File Structure:**
 - `server/index.ts` - Application entry point and middleware setup
@@ -90,21 +91,66 @@ Preferred communication style: Simple, everyday language.
 - Migration files in `./migrations` directory
 - Push-based deployment with `db:push` script
 
-**Current Schema:**
+**Implemented Schema:**
 ```typescript
 users {
   id: UUID (primary key)
-  username: text (unique)
-  password: text
+  email: text (unique)
+  password: text (hashed with bcrypt)
+  name: text
+  phone: text (for WhatsApp contact)
+  coinBalance: integer (default 0)
+  role: text (user/admin)
+  createdAt: timestamp
+}
+
+templates {
+  id: UUID (primary key)
+  name: text
+  category: text
+  description: text
+  thumbnailUrl: text
+  gradientColors: text[]
+  isPremium: boolean
+}
+
+processingJobs {
+  id: UUID (primary key)
+  userId: UUID (foreign key)
+  templateId: UUID (optional, foreign key)
+  status: text (queued/processing/completed/failed)
+  totalImages: integer
+  processedImages: integer
+  zipUrl: text (optional)
+  batchSettings: jsonb (stores background prompts)
+  createdAt: timestamp
+}
+
+images {
+  id: UUID (primary key)
+  jobId: UUID (foreign key)
+  originalUrl: text
+  processedUrl: text (optional)
+  status: text (pending/processing/completed/failed)
+}
+
+transactions {
+  id: UUID (primary key)
+  userId: UUID (foreign key)
+  type: text (purchase/usage)
+  amount: integer
+  description: text
+  metadata: jsonb
+  createdAt: timestamp
+}
+
+templateFavorites {
+  id: UUID (primary key)
+  userId: UUID (foreign key)
+  templateId: UUID (foreign key)
+  createdAt: timestamp
 }
 ```
-
-**Planned Extensions** (based on UI):
-- Templates table (id, name, category, thumbnailUrl, gradient)
-- Jobs table (id, userId, templateId, status, progress, imageCount)
-- Transactions table (id, userId, type, amount, description)
-- Favorites/UserTemplates junction table
-- Team members and API keys tables
 
 ### External Dependencies
 
@@ -134,13 +180,66 @@ users {
 - tsx for TypeScript execution in development
 - Replit-specific plugins (runtime error overlay, cartographer, dev banner)
 
-**Planned Integrations** (based on UI):
-- Image processing backend (Python/OpenCV or cloud service)
-- Cloud storage (S3/Google Drive/Dropbox) for processed images
-- E-commerce platforms (Shopify, WooCommerce, Amazon Seller Central)
-- Payment processing for coin purchases
-- Email service for notifications
+### AI Image Processing Architecture
 
-**Third-Party Services Ready:**
+**Python Service (Port 5001):**
+- Flask-based microservice for AI image processing
+- Background removal using color-based segmentation (placeholder for BiRefNet/U2-Net)
+- AI background generation from text prompts (gradient-based, upgradeable to Stable Diffusion)
+- Image compositing and 1080x1080px output generation
+- RESTful API endpoints: `/process`, `/batch-process`, `/health`
+
+**Integration with Node.js Backend:**
+- Backend calls Python service via HTTP (axios)
+- Base64 image encoding for data transfer
+- Async job processing with setTimeout for background tasks
+- Processed images saved to `uploads/processed/` directory
+- Automatic ZIP creation for batch downloads
+
+**Current Implementation:**
+- Simple color-based background removal (production-ready for BiRefNet upgrade)
+- Gradient generation from text descriptions (production-ready for Stable Diffusion upgrade)
+- No external API dependencies (fully self-hosted)
+
+### Admin Features
+
+**Coin Management via WhatsApp/Phone:**
+- Admin panel at `/admin` route (admin role required)
+- User phone numbers stored for WhatsApp contact
+- Manual coin distribution after payment confirmation
+- Transaction logging with metadata (admin ID, description)
+- Real-time balance updates via TanStack Query
+
+**Admin Capabilities:**
+- View all users with phone/WhatsApp details
+- Add coins to any user account
+- Atomic coin transactions with SQL-level safety
+- Transaction history tracking
+
+**Note on WhatsApp Integration:**
+- Currently using manual phone-based workflow (admin contacts users via WhatsApp)
+- Future enhancement: Twilio API for automated WhatsApp messaging (not implemented - user prefers manual approach)
+- Phone field in users table ready for integration
+
+**Active Integrations:**
+- Replit Database (PostgreSQL)
+- Replit Authentication (OIDC) - available but using custom auth
+- Session management via connect-pg-simple
+
+**Third-Party Services:**
+- No external API dependencies for image processing (self-hosted)
 - Google Fonts (Inter, JetBrains Mono)
-- Social login providers (infrastructure in auth schema)
+
+## Recent Updates (January 2025)
+
+**Self-Hosted AI Implementation:**
+- Python 3.11 service created for background removal and AI generation
+- No dependency on Remove.bg, OpenAI, or other external APIs
+- Upgradeable architecture for BiRefNet (SOTA 2025) and Stable Diffusion
+- All processing happens locally on server
+
+**Admin Panel & Coin System:**
+- Phone field added to users for WhatsApp contact
+- Admin routes for user management (`/api/admin/users`, `/api/admin/users/:id/add-coins`)
+- Complete coin distribution workflow via manual WhatsApp confirmation
+- Atomic transaction system prevents race conditions
