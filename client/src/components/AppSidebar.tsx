@@ -16,6 +16,11 @@ import {
   History,
   Wallet,
   Settings,
+  BarChart3,
+  Users,
+  Gift,
+  Plug,
+  Code,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 
@@ -25,6 +30,17 @@ const menuItems = [
   { title: "Upload", url: "/upload", icon: Upload },
   { title: "History", url: "/history", icon: History },
   { title: "Wallet", url: "/wallet", icon: Wallet },
+];
+
+const businessItems = [
+  { title: "Analytics", url: "/analytics", icon: BarChart3 },
+  { title: "Team", url: "/team", icon: Users },
+  { title: "Referrals", url: "/referrals", icon: Gift },
+];
+
+const developersItems = [
+  { title: "Integrations", url: "/integrations", icon: Plug },
+  { title: "API Access", url: "/api", icon: Code },
 ];
 
 const adminItems = [
@@ -50,6 +66,48 @@ export default function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location === item.url}
+                    data-testid={`link-${item.title.toLowerCase()}`}
+                  >
+                    <Link href={item.url}>
+                      <item.icon className="w-4 h-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Business</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {businessItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location === item.url}
+                    data-testid={`link-${item.title.toLowerCase()}`}
+                  >
+                    <Link href={item.url}>
+                      <item.icon className="w-4 h-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Developers</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {developersItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild

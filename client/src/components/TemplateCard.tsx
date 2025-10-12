@@ -1,6 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Check } from "lucide-react";
+import TemplateFavorites from "./TemplateFavorites";
 
 interface TemplateCardProps {
   id: string;
@@ -9,7 +10,9 @@ interface TemplateCardProps {
   thumbnailUrl?: string;
   gradient?: string;
   isSelected?: boolean;
+  isFavorite?: boolean;
   onClick?: () => void;
+  onToggleFavorite?: (id: string, isFavorite: boolean) => void;
 }
 
 export default function TemplateCard({
@@ -19,7 +22,9 @@ export default function TemplateCard({
   thumbnailUrl,
   gradient,
   isSelected = false,
+  isFavorite = false,
   onClick,
+  onToggleFavorite,
 }: TemplateCardProps) {
   const getGradient = () => {
     if (gradient) return gradient;
@@ -76,6 +81,11 @@ export default function TemplateCard({
             <Check className="w-4 h-4" />
           </div>
         )}
+        <TemplateFavorites
+          templateId={id}
+          initialFavorite={isFavorite}
+          onToggleFavorite={onToggleFavorite}
+        />
       </div>
       <div className="p-3">
         <h3 className="font-semibold text-sm truncate" data-testid={`text-template-name-${id}`}>

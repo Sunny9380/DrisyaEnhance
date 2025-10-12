@@ -16,7 +16,14 @@ import Upload from "@/pages/Upload";
 import History from "@/pages/History";
 import Wallet from "@/pages/Wallet";
 import Admin from "@/pages/Admin";
+import Analytics from "@/pages/Analytics";
+import Referrals from "@/pages/Referrals";
+import Team from "@/pages/Team";
+import Integrations from "@/pages/Integrations";
+import APIAccess from "@/pages/APIAccess";
 import NotFound from "@/pages/NotFound";
+import NotificationCenter from "@/components/NotificationCenter";
+import KeyboardShortcuts from "@/components/KeyboardShortcuts";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -47,6 +54,11 @@ function AuthenticatedRouter() {
       <Route path="/upload" component={Upload} />
       <Route path="/history" component={History} />
       <Route path="/wallet" component={Wallet} />
+      <Route path="/analytics" component={Analytics} />
+      <Route path="/referrals" component={Referrals} />
+      <Route path="/team" component={Team} />
+      <Route path="/integrations" component={Integrations} />
+      <Route path="/api" component={APIAccess} />
       <Route path="/admin" component={Admin} />
       <Route component={NotFound} />
     </Switch>
@@ -85,6 +97,7 @@ export default function App() {
                       balance={2500}
                       onAddCoins={() => console.log("Add coins clicked")}
                     />
+                    <NotificationCenter />
                     <ThemeToggle />
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -119,6 +132,7 @@ export default function App() {
               </div>
             </div>
             <Toaster />
+            <KeyboardShortcuts />
           </SidebarProvider>
         )}
       </TooltipProvider>

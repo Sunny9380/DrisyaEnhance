@@ -1,10 +1,12 @@
 import StatsCard from "@/components/StatsCard";
 import JobCard from "@/components/JobCard";
-import ProductShowcase from "@/components/ProductShowcase";
+import ImageComparisonSlider from "@/components/ImageComparisonSlider";
 import { Image, CheckCircle, Clock, Coins } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { Separator } from "@/components/ui/separator";
+import earringsWhiteBg from "@assets/WhatsApp Image 2025-10-12 at 14.02.54_bef9f90d_1760283307730.jpg";
+import earringsDarkBg from "@assets/WhatsApp Image 2025-10-12 at 14.03.27_c425ce07_1760283310185.jpg";
 
 export default function Dashboard() {
   const mockJobs = [
@@ -41,7 +43,14 @@ export default function Dashboard() {
         </p>
       </div>
 
-      <ProductShowcase />
+      <div className="max-w-3xl">
+        <ImageComparisonSlider
+          beforeImage={earringsWhiteBg}
+          afterImage={earringsDarkBg}
+          beforeLabel="Original"
+          afterLabel="Enhanced with Drisya"
+        />
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import UploadDropzone from "@/components/UploadDropzone";
 import TemplateCard from "@/components/TemplateCard";
+import BatchEditPanel from "@/components/BatchEditPanel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -68,23 +69,34 @@ export default function Upload() {
             </AlertDescription>
           </Alert>
 
-          <div className="flex gap-4">
-            <Button
-              size="lg"
-              className="flex-1"
-              onClick={() => console.log("Start processing")}
-              data-testid="button-start-processing"
-            >
-              Start Processing
-            </Button>
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={() => setFiles([])}
-              data-testid="button-cancel-upload"
-            >
-              Cancel
-            </Button>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <h2 className="text-lg font-semibold mb-4">Ready to Process</h2>
+              <div className="flex gap-4">
+                <Button
+                  size="lg"
+                  className="flex-1"
+                  onClick={() => console.log("Start processing")}
+                  data-testid="button-start-processing"
+                >
+                  Start Processing
+                </Button>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={() => setFiles([])}
+                  data-testid="button-cancel-upload"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+            <div>
+              <BatchEditPanel
+                imageCount={files.length}
+                onApply={(settings) => console.log("Apply settings:", settings)}
+              />
+            </div>
           </div>
         </>
       )}
