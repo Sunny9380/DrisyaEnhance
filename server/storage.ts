@@ -27,6 +27,11 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUserCoins(userId: string, amount: number): Promise<void>;
+  addCoinsWithTransaction(
+    userId: string,
+    amount: number,
+    transactionData: Omit<InsertTransaction, "userId" | "amount">
+  ): Promise<void>;
 
   // Templates
   getAllTemplates(): Promise<Template[]>;
@@ -81,6 +86,37 @@ export class DbStorage implements IStorage {
       .update(users)
       .set({ coinBalance: sql`${users.coinBalance} + ${amount}` })
       .where(eq(users.id, userId));
+  }
+
+  async addCoinsWithTransaction(
+    userId: string,
+    amount: number,
+    transactionData: Omit<InsertTransaction, "userId" | "amount">
+  ): Promise<void> {
+    await db.transaction(async (tx) => {
+      // Update user balance with row-level check for negative balance
+      const result = await tx
+        .update(users)
+        .set({ coinBalance: sql`${users.coinBalance} + ${amount}` })
+        .where(
+          and(
+            eq(users.id, userId),
+            sql`${users.coinBalance} + ${amount} >= 0`
+          )
+        )
+        .returning();
+
+      if (result.length === 0) {
+        throw new Error("Insufficient coins or user not found");
+      }
+
+      // Create transaction record
+      await tx.insert(transactions).values({
+        userId,
+        amount,
+        ...transactionData,
+      });
+    });
   }
 
   // Templates

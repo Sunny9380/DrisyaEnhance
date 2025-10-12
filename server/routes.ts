@@ -37,16 +37,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         password: hashedPassword,
       });
 
-      // Give welcome bonus coins
-      await storage.createTransaction({
-        userId: user.id,
+      // Give welcome bonus coins (atomic transaction)
+      await storage.addCoinsWithTransaction(user.id, 100, {
         type: "purchase",
-        amount: 100,
         description: "Welcome bonus - 100 free coins",
         metadata: { source: "welcome_bonus" },
       });
-      
-      await storage.updateUserCoins(user.id, 100);
 
       // Set session
       req.session.userId = user.id;
@@ -216,17 +212,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         await Promise.all(imagePromises);
 
-        // Deduct coins
-        await storage.updateUserCoins(req.session.userId, -coinsNeeded);
-
-        // Record transaction
-        await storage.createTransaction({
-          userId: req.session.userId,
-          type: "usage",
-          amount: -coinsNeeded,
-          description: `Processed ${files.length} images`,
-          metadata: { jobId: job.id },
-        });
+        // Deduct coins atomically
+        try {
+          await storage.addCoinsWithTransaction(req.session.userId, -coinsNeeded, {
+            type: "usage",
+            description: `Processed ${files.length} images`,
+            metadata: { jobId: job.id },
+          });
+        } catch (error: any) {
+          // If coin deduction fails, clean up the job and images
+          await storage.updateProcessingJobStatus(job.id, "failed", 0);
+          
+          if (error.message.includes("Insufficient coins")) {
+            return res.status(400).json({ message: "Insufficient coins to process images" });
+          }
+          throw error;
+        }
 
         // Start processing (mock - in reality, this would trigger a background job)
         // For now, we'll just mark it as completed immediately
@@ -271,6 +272,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
               files.length,
               `/uploads/processed/${zipFileName}`
             );
+
+            // Clean up temporary uploaded files
+            for (const image of jobImages) {
+              try {
+                const tempPath = path.join("uploads", path.basename(image.originalUrl));
+                await fs.unlink(tempPath);
+              } catch (err) {
+                console.error(`Failed to delete temp file: ${err}`);
+              }
+            }
 
             console.log(`Job ${job.id} completed`);
           } catch (error) {
@@ -386,14 +397,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid package" });
       }
 
-      // Add coins
-      await storage.updateUserCoins(req.session.userId, selectedPackage.coins);
-
-      // Record transaction
-      await storage.createTransaction({
-        userId: req.session.userId,
+      // Add coins atomically
+      await storage.addCoinsWithTransaction(req.session.userId, selectedPackage.coins, {
         type: "purchase",
-        amount: selectedPackage.coins,
         description: `Purchased ${packageType} package (${selectedPackage.coins} coins)`,
         metadata: { package: packageType, price: selectedPackage.price },
       });
