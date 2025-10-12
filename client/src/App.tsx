@@ -1,0 +1,100 @@
+import { Switch, Route } from "wouter";
+import { queryClient } from "./lib/queryClient";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import AppSidebar from "@/components/AppSidebar";
+import ThemeToggle from "@/components/ThemeToggle";
+import CoinBalance from "@/components/CoinBalance";
+import Dashboard from "@/pages/Dashboard";
+import Templates from "@/pages/Templates";
+import Upload from "@/pages/Upload";
+import History from "@/pages/History";
+import Wallet from "@/pages/Wallet";
+import Admin from "@/pages/Admin";
+import NotFound from "@/pages/NotFound";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { User, LogOut } from "lucide-react";
+
+function Router() {
+  return (
+    <Switch>
+      <Route path="/" component={Dashboard} />
+      <Route path="/templates" component={Templates} />
+      <Route path="/upload" component={Upload} />
+      <Route path="/history" component={History} />
+      <Route path="/wallet" component={Wallet} />
+      <Route path="/admin" component={Admin} />
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
+
+export default function App() {
+  const style = {
+    "--sidebar-width": "20rem",
+    "--sidebar-width-icon": "4rem",
+  };
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <SidebarProvider style={style as React.CSSProperties}>
+          <div className="flex h-screen w-full">
+            <AppSidebar />
+            <div className="flex flex-col flex-1 overflow-hidden">
+              <header className="flex items-center justify-between px-6 py-4 border-b border-border bg-background sticky top-0 z-10">
+                <SidebarTrigger data-testid="button-sidebar-toggle" />
+                <div className="flex items-center gap-4">
+                  <CoinBalance
+                    balance={2500}
+                    onAddCoins={() => console.log("Add coins clicked")}
+                  />
+                  <ThemeToggle />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="focus:outline-none" data-testid="button-user-menu">
+                        <Avatar className="w-9 h-9 cursor-pointer hover-elevate active-elevate-2">
+                          <AvatarFallback className="bg-primary text-primary-foreground">
+                            JD
+                          </AvatarFallback>
+                        </Avatar>
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem data-testid="menu-profile">
+                        <User className="w-4 h-4 mr-2" />
+                        Profile
+                      </DropdownMenuItem>
+                      <DropdownMenuItem data-testid="menu-logout">
+                        <LogOut className="w-4 h-4 mr-2" />
+                        Logout
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </header>
+              <main className="flex-1 overflow-auto">
+                <div className="p-6 lg:p-12 max-w-7xl mx-auto">
+                  <Router />
+                </div>
+              </main>
+            </div>
+          </div>
+        </SidebarProvider>
+        <Toaster />
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+}
