@@ -6,18 +6,44 @@ import { Label } from "@/components/ui/label";
 import { Link, useLocation } from "wouter";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Info } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Register() {
   const [, setLocation] = useLocation();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const { toast } = useToast();
+
+  const registerMutation = useMutation({
+    mutationFn: async (data: { name: string; email: string; password: string }) => {
+      return await apiRequest("/api/auth/register", {
+        method: "POST",
+        body: JSON.stringify(data),
+        headers: { "Content-Type": "application/json" },
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Account created!",
+        description: "Welcome to Drisya! You received 100 welcome coins.",
+      });
+      setLocation("/dashboard");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Registration failed",
+        description: error.message || "Please try again",
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Register:", { name, email, password });
-    // TODO: Implement actual registration logic
-    setLocation("/dashboard");
+    registerMutation.mutate({ name, email, password });
   };
 
   return (
@@ -89,8 +115,13 @@ export default function Register() {
               </p>
             </div>
 
-            <Button type="submit" className="w-full" data-testid="button-register">
-              Create Account
+            <Button 
+              type="submit" 
+              className="w-full" 
+              data-testid="button-register"
+              disabled={registerMutation.isPending}
+            >
+              {registerMutation.isPending ? "Creating Account..." : "Create Account"}
             </Button>
           </form>
 

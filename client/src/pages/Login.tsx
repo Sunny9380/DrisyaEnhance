@@ -6,17 +6,39 @@ import { Label } from "@/components/ui/label";
 import { Link, useLocation } from "wouter";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Info } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Login() {
   const [, setLocation] = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const { toast } = useToast();
+
+  const loginMutation = useMutation({
+    mutationFn: async (data: { email: string; password: string }) => {
+      return await apiRequest("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify(data),
+        headers: { "Content-Type": "application/json" },
+      });
+    },
+    onSuccess: () => {
+      setLocation("/dashboard");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Login failed",
+        description: error.message || "Invalid credentials",
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Login:", { email, password });
-    // TODO: Implement actual login logic
-    setLocation("/dashboard");
+    loginMutation.mutate({ email, password });
   };
 
   return (
@@ -81,8 +103,13 @@ export default function Login() {
               />
             </div>
 
-            <Button type="submit" className="w-full" data-testid="button-login">
-              Sign In
+            <Button 
+              type="submit" 
+              className="w-full" 
+              data-testid="button-login"
+              disabled={loginMutation.isPending}
+            >
+              {loginMutation.isPending ? "Signing In..." : "Sign In"}
             </Button>
           </form>
 

@@ -1,6 +1,6 @@
 import { Switch, Route, useLocation } from "wouter";
-import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "./lib/queryClient";
+import { QueryClientProvider, useQuery, useMutation } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -65,76 +65,100 @@ function AuthenticatedRouter() {
   );
 }
 
-export default function App() {
+function AppContent() {
   const [location, setLocation] = useLocation();
   
   // Public routes (landing, login, register)
   const publicRoutes = ["/", "/login", "/register"];
   const isPublicRoute = publicRoutes.includes(location);
 
+  // Fetch current user
+  const { data: userData } = useQuery({
+    queryKey: ["/api/auth/me"],
+    enabled: !isPublicRoute,
+    retry: false,
+  });
+
+  const user = userData?.user;
+
   const style = {
     "--sidebar-width": "20rem",
     "--sidebar-width-icon": "4rem",
   };
 
+  if (isPublicRoute) {
+    return (
+      <>
+        <PublicRouter />
+        <Toaster />
+      </>
+    );
+  }
+
+  return (
+    <SidebarProvider style={style as React.CSSProperties}>
+      <div className="flex h-screen w-full">
+        <AppSidebar />
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <header className="flex items-center justify-between px-6 py-4 border-b border-border bg-background sticky top-0 z-10">
+            <SidebarTrigger data-testid="button-sidebar-toggle" />
+            <div className="flex items-center gap-4">
+              <CoinBalance
+                balance={user?.coinBalance || 0}
+                onAddCoins={() => setLocation("/wallet")}
+              />
+              <NotificationCenter />
+              <ThemeToggle />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="focus:outline-none" data-testid="button-user-menu">
+                    <Avatar className="w-9 h-9 cursor-pointer hover-elevate active-elevate-2">
+                      <AvatarFallback className="bg-primary text-primary-foreground">
+                        {user?.name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || "U"}
+                      </AvatarFallback>
+                    </Avatar>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem data-testid="menu-profile">
+                    <User className="w-4 h-4 mr-2" />
+                    Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={async () => {
+                      await apiRequest("/api/auth/logout", { method: "POST" });
+                      queryClient.clear();
+                      setLocation("/");
+                    }} 
+                    data-testid="menu-logout"
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </header>
+          <main className="flex-1 overflow-auto">
+            <div className="p-6 lg:p-12 max-w-7xl mx-auto">
+              <AuthenticatedRouter />
+            </div>
+          </main>
+        </div>
+      </div>
+      <Toaster />
+      <KeyboardShortcuts />
+    </SidebarProvider>
+  );
+}
+
+export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        {isPublicRoute ? (
-          <>
-            <PublicRouter />
-            <Toaster />
-          </>
-        ) : (
-          <SidebarProvider style={style as React.CSSProperties}>
-            <div className="flex h-screen w-full">
-              <AppSidebar />
-              <div className="flex flex-col flex-1 overflow-hidden">
-                <header className="flex items-center justify-between px-6 py-4 border-b border-border bg-background sticky top-0 z-10">
-                  <SidebarTrigger data-testid="button-sidebar-toggle" />
-                  <div className="flex items-center gap-4">
-                    <CoinBalance
-                      balance={2500}
-                      onAddCoins={() => console.log("Add coins clicked")}
-                    />
-                    <NotificationCenter />
-                    <ThemeToggle />
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button className="focus:outline-none" data-testid="button-user-menu">
-                          <Avatar className="w-9 h-9 cursor-pointer hover-elevate active-elevate-2">
-                            <AvatarFallback className="bg-primary text-primary-foreground">
-                              JD
-                            </AvatarFallback>
-                          </Avatar>
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56">
-                        <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem data-testid="menu-profile">
-                          <User className="w-4 h-4 mr-2" />
-                          Profile
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setLocation("/")} data-testid="menu-logout">
-                          <LogOut className="w-4 h-4 mr-2" />
-                          Logout
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </header>
-                <main className="flex-1 overflow-auto">
-                  <div className="p-6 lg:p-12 max-w-7xl mx-auto">
-                    <AuthenticatedRouter />
-                  </div>
-                </main>
-              </div>
-            </div>
-            <Toaster />
-            <KeyboardShortcuts />
-          </SidebarProvider>
-        )}
+        <AppContent />
       </TooltipProvider>
     </QueryClientProvider>
   );
