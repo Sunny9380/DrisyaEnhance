@@ -157,7 +157,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const users = await storage.getAllUsers();
-      res.json({ users });
+      
+      // Sanitize: Remove password field before sending to client
+      const safeUsers = users.map(({ password, ...user }) => user);
+      
+      res.json({ users: safeUsers });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
