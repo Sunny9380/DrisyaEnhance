@@ -11,10 +11,10 @@ export default function Upload() {
   const [files, setFiles] = useState<File[]>([]);
 
   const mockTemplates = [
-    { id: "1", name: "Blue Gradient", category: "Minimal" },
+    { id: "1", name: "Premium Dark Fabric", category: "Elegant" },
     { id: "2", name: "White Studio", category: "Studio" },
-    { id: "3", name: "Wooden Table", category: "Natural" },
-    { id: "4", name: "Pink Pastel", category: "Colorful" },
+    { id: "3", name: "Blue Gradient", category: "Minimal" },
+    { id: "4", name: "Rose Gold", category: "Elegant" },
   ];
 
   const estimatedCoins = files.length * 2;

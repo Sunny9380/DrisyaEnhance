@@ -1,8 +1,10 @@
 import StatsCard from "@/components/StatsCard";
 import JobCard from "@/components/JobCard";
+import ProductShowcase from "@/components/ProductShowcase";
 import { Image, CheckCircle, Clock, Coins } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
+import { Separator } from "@/components/ui/separator";
 
 export default function Dashboard() {
   const mockJobs = [
@@ -31,13 +33,15 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="space-y-8" data-testid="page-dashboard">
+    <div className="space-y-12" data-testid="page-dashboard">
       <div>
         <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
         <p className="text-muted-foreground">
           Welcome back! Here's your image processing overview.
         </p>
       </div>
+
+      <ProductShowcase />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard
@@ -89,6 +93,8 @@ export default function Dashboard() {
           ))}
         </div>
       </div>
+
+      <Separator />
 
       <div className="flex gap-4">
         <Link href="/templates">
