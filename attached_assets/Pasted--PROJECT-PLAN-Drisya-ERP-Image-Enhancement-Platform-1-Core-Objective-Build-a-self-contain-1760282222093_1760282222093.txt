@@ -1,0 +1,299 @@
+🧭 PROJECT PLAN — “Drisya ERP Image Enhancement Platform”
+1. 🎯 Core Objective
+
+Build a self-contained, AI-powered image enhancement system (React + Node + Python/OpenCV backend) that can:
+
+Remove or adjust white backgrounds
+
+Apply high-quality enhancement
+
+Place products onto selected templates (100+)
+
+Process bulk uploads (1000+ images)
+
+Provide coin-based access control for users
+
+2. 🧱 High-Level Architecture
+🔸 Frontend (React)
+
+Purpose: User interface for uploading, selecting templates, managing coins, and downloading results.
+
+Modules:
+
+Auth & Profile
+
+Register/Login, wallet (coins), history.
+
+Template Gallery
+
+100+ templates shown as thumbnails (searchable & filterable).
+
+Upload Center
+
+Upload ZIP or multiple images.
+
+Progress display during upload and processing.
+
+Processing Dashboard
+
+Shows batch status (e.g., “Processing 243/1000…”).
+
+Download Section
+
+Download processed ZIP or individual images.
+
+Admin Panel
+
+Manage templates, users, and coin pricing.
+
+🔸 Backend (Node.js + Express)
+
+Purpose: API gateway between frontend, image processor, and database.
+
+Main Responsibilities:
+
+Receive uploaded ZIP
+
+Unzip and queue all images
+
+Assign selected template
+
+Pass jobs to the Image Processing Engine
+
+Track status & completion
+
+Manage coin-based transactions
+
+Serve processed outputs
+
+🔸 Image Processing Engine (Python or Node Worker)
+
+Purpose: Handles the heavy lifting — background removal, enhancement, and placement.
+
+Key Features:
+
+Background detection & masking (OpenCV, U²-Net model)
+
+Color correction & lighting normalization
+
+High-clarity sharpening + contrast boost
+
+Smart alignment (auto-center product on template)
+
+Apply selected template layer (PNG/JPG background)
+
+Batch automation with queuing (Redis or RabbitMQ)
+
+🔸 Database (MongoDB or PostgreSQL)
+
+Tables/Collections:
+
+users: login info, coin balance
+
+templates: background assets, tags
+
+jobs: batch upload details
+
+images: each image’s status, output path
+
+transactions: coin purchase + usage
+
+admin: template and user management
+
+🔸 Storage
+
+Local / S3 bucket for:
+
+Raw uploads
+
+Processed outputs
+
+Templates (100+)
+
+ZIP downloads
+
+3. ⚙️ Detailed Functional Modules
+3.1 Module 1 — Ready to Use
+
+Purpose: Quick placement & download.
+Flow:
+
+Select template
+
+Upload ZIP
+
+System:
+
+Unzips images
+
+Removes background
+
+Enhances image
+
+Places on selected template
+
+Compresses outputs into ZIP
+
+Download ready ZIP
+
+3.2 Module 2 — Make a Drisya Look
+
+Purpose: Advanced customization.
+Options:
+
+Aspect ratio (1:1, 4:5, 16:9)
+
+Size (px)
+
+Platform preset (Instagram, Amazon, etc.)
+
+Light/shadow control per background
+Flow:
+
+User sets configurations
+
+System applies these settings globally to the batch
+
+Outputs generated accordingly
+
+3.3 Module 3 — Surprise for You
+
+Purpose: Auto-create creative versions (themed).
+Flow:
+
+User selects “Surprise” theme
+
+System applies automatic background, color, and shadow variations
+
+Outputs ready as image/video set
+
+3.4 Module 4 — Payment (Coin Based)
+
+Flow:
+
+User buys coins (1 coin = X ₹)
+
+Each processed image deducts defined coins
+
+Admin sets:
+
+Coin rate per image/module
+
+Promotions, bonuses
+
+4. 🧠 Image Processing Pipeline (Core Engine Logic)
+Step 1: Background Detection & Removal
+
+Use OpenCV for color thresholding
+
+For better accuracy: local U²-Net or MODNet model for matting
+
+Step 2: Retouch & Enhancement
+
+Auto white balance correction
+
+Sharpen edges, reduce noise
+
+Color normalization
+
+Resize & crop for composition
+
+Step 3: Apply Template
+
+Overlay transparent product on the selected template
+
+Adjust lighting to match template tone
+
+Auto-center + add drop shadow if needed
+
+Step 4: Export & Compress
+
+Save as high-quality PNG/JPG
+
+Combine into a ZIP for batch download
+
+5. ⚡ Performance & Scaling Plan
+Feature	Strategy
+Bulk uploads	Queue system (Redis / RabbitMQ)
+Parallel processing	Multi-threaded workers (Python/Node cluster)
+Progress tracking	Job table + WebSocket updates
+Storage	AWS S3 / GCP Storage for scalability
+Caching	Use Redis for frequently used templates
+Compression	Stream ZIP generation on-the-fly
+6. 🔐 Security & Stability
+
+JWT-based authentication
+
+File upload validation (only JPG/PNG, size limits)
+
+Coin system to prevent abuse
+
+Role-based access (Client / Admin)
+
+Encrypted API keys and payment gateway integration
+
+7. 🧩 Tech Stack Summary
+Layer	Tech
+Frontend	React + Tailwind + Redux Toolkit
+Backend API	Node.js + Express
+Image Engine	Python (OpenCV, Pillow, U²-Net) or Node (opencv4nodejs, sharp)
+Database	MongoDB / PostgreSQL
+Storage	Local / AWS S3
+Queue	Redis / BullMQ
+Auth	JWT
+Payment	Razorpay / Stripe
+Deployment	Docker + Nginx + CI/CD
+8. 🚀 Development Roadmap
+Phase 1 – MVP (4–6 Weeks)
+
+User auth & coin system
+
+Template management (Admin)
+
+Upload single/batch images
+
+Background removal + blue placement
+
+Download ZIP
+
+Phase 2 – Advanced (6–10 Weeks)
+
+Customization module (aspect ratio, platform presets)
+
+AI-based background matching
+
+Batch progress tracking (live)
+
+Payment gateway + transaction logs
+
+Phase 3 – Scaling & Automation
+
+100+ templates with tagging
+
+Creative (Surprise) outputs
+
+Video versioning
+
+Auto email notifications & analytics dashboard
+
+9. 🧩 Example User Flow (for Your Case)
+
+You (admin) upload 100+ templates.
+
+You log in → select Template #23 (Blue Background).
+
+You upload a ZIP (say, 1000 product images).
+
+System unzips and queues all 1000 files.
+
+Image engine processes each:
+
+Removes white background
+
+Enhances clarity
+
+Places on blue background template
+
+Once all are done → generates output.zip
+
+You download output.zip with all cleaned, ready-to-use images.
