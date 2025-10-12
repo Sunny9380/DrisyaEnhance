@@ -20,7 +20,7 @@ import {
 import { Link, useLocation } from "wouter";
 
 const menuItems = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Templates", url: "/templates", icon: Images },
   { title: "Upload", url: "/upload", icon: Upload },
   { title: "History", url: "/history", icon: History },

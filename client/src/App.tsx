@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -7,6 +7,9 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import AppSidebar from "@/components/AppSidebar";
 import ThemeToggle from "@/components/ThemeToggle";
 import CoinBalance from "@/components/CoinBalance";
+import Landing from "@/pages/Landing";
+import Login from "@/pages/Login";
+import Register from "@/pages/Register";
 import Dashboard from "@/pages/Dashboard";
 import Templates from "@/pages/Templates";
 import Upload from "@/pages/Upload";
@@ -25,10 +28,21 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { User, LogOut } from "lucide-react";
 
-function Router() {
+function PublicRouter() {
   return (
     <Switch>
-      <Route path="/" component={Dashboard} />
+      <Route path="/" component={Landing} />
+      <Route path="/login" component={Login} />
+      <Route path="/register" component={Register} />
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
+
+function AuthenticatedRouter() {
+  return (
+    <Switch>
+      <Route path="/dashboard" component={Dashboard} />
       <Route path="/templates" component={Templates} />
       <Route path="/upload" component={Upload} />
       <Route path="/history" component={History} />
@@ -40,6 +54,12 @@ function Router() {
 }
 
 export default function App() {
+  const [location, setLocation] = useLocation();
+  
+  // Public routes (landing, login, register)
+  const publicRoutes = ["/", "/login", "/register"];
+  const isPublicRoute = publicRoutes.includes(location);
+
   const style = {
     "--sidebar-width": "20rem",
     "--sidebar-width-icon": "4rem",
@@ -48,52 +68,59 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <SidebarProvider style={style as React.CSSProperties}>
-          <div className="flex h-screen w-full">
-            <AppSidebar />
-            <div className="flex flex-col flex-1 overflow-hidden">
-              <header className="flex items-center justify-between px-6 py-4 border-b border-border bg-background sticky top-0 z-10">
-                <SidebarTrigger data-testid="button-sidebar-toggle" />
-                <div className="flex items-center gap-4">
-                  <CoinBalance
-                    balance={2500}
-                    onAddCoins={() => console.log("Add coins clicked")}
-                  />
-                  <ThemeToggle />
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button className="focus:outline-none" data-testid="button-user-menu">
-                        <Avatar className="w-9 h-9 cursor-pointer hover-elevate active-elevate-2">
-                          <AvatarFallback className="bg-primary text-primary-foreground">
-                            JD
-                          </AvatarFallback>
-                        </Avatar>
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem data-testid="menu-profile">
-                        <User className="w-4 h-4 mr-2" />
-                        Profile
-                      </DropdownMenuItem>
-                      <DropdownMenuItem data-testid="menu-logout">
-                        <LogOut className="w-4 h-4 mr-2" />
-                        Logout
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </header>
-              <main className="flex-1 overflow-auto">
-                <div className="p-6 lg:p-12 max-w-7xl mx-auto">
-                  <Router />
-                </div>
-              </main>
+        {isPublicRoute ? (
+          <>
+            <PublicRouter />
+            <Toaster />
+          </>
+        ) : (
+          <SidebarProvider style={style as React.CSSProperties}>
+            <div className="flex h-screen w-full">
+              <AppSidebar />
+              <div className="flex flex-col flex-1 overflow-hidden">
+                <header className="flex items-center justify-between px-6 py-4 border-b border-border bg-background sticky top-0 z-10">
+                  <SidebarTrigger data-testid="button-sidebar-toggle" />
+                  <div className="flex items-center gap-4">
+                    <CoinBalance
+                      balance={2500}
+                      onAddCoins={() => console.log("Add coins clicked")}
+                    />
+                    <ThemeToggle />
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className="focus:outline-none" data-testid="button-user-menu">
+                          <Avatar className="w-9 h-9 cursor-pointer hover-elevate active-elevate-2">
+                            <AvatarFallback className="bg-primary text-primary-foreground">
+                              JD
+                            </AvatarFallback>
+                          </Avatar>
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem data-testid="menu-profile">
+                          <User className="w-4 h-4 mr-2" />
+                          Profile
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setLocation("/")} data-testid="menu-logout">
+                          <LogOut className="w-4 h-4 mr-2" />
+                          Logout
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </header>
+                <main className="flex-1 overflow-auto">
+                  <div className="p-6 lg:p-12 max-w-7xl mx-auto">
+                    <AuthenticatedRouter />
+                  </div>
+                </main>
+              </div>
             </div>
-          </div>
-        </SidebarProvider>
-        <Toaster />
+            <Toaster />
+          </SidebarProvider>
+        )}
       </TooltipProvider>
     </QueryClientProvider>
   );
