@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import UploadDropzone from "@/components/UploadDropzone";
 import BatchEditPanel from "@/components/BatchEditPanel";
 import { Button } from "@/components/ui/button";
@@ -46,10 +46,18 @@ export default function Upload() {
   // Create processing job mutation
   const createJobMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      return await apiRequest("/api/jobs", {
+      const res = await fetch("/api/jobs", {
         method: "POST",
         body: formData,
+        credentials: "include",
       });
+      
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || res.statusText);
+      }
+      
+      return await res.json();
     },
     onSuccess: (data: any) => {
       toast({

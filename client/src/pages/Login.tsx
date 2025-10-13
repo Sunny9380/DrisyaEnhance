@@ -60,7 +60,7 @@ export default function Login() {
           <Alert className="mb-6">
             <Info className="w-4 h-4" />
             <AlertDescription className="text-sm">
-              Demo: Use any email and password to access the dashboard
+              Demo: demo@drisya.com / password123 (500 coins)
             </AlertDescription>
           </Alert>
 

@@ -324,7 +324,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: "Insufficient coins" });
         }
 
-        // Create processing job
+        // Create processing job with IP logging for security audit
+        const clientIP = getClientIP(req);
         const job = await storage.createProcessingJob({
           userId: req.session.userId,
           templateId,
@@ -332,6 +333,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           coinsUsed: coinsNeeded,
           status: "queued",
           batchSettings: batchSettings ? JSON.parse(batchSettings) : null,
+          ipAddress: clientIP,
         });
 
         // Create image records
@@ -344,6 +346,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         await Promise.all(imagePromises);
+
+        // Log job creation for security audit trail
+        await logAudit(
+          req.session.userId,
+          'job_created',
+          clientIP,
+          req.headers['user-agent'],
+          { 
+            jobId: job.id, 
+            imageCount: files.length,
+            coinsUsed: coinsNeeded,
+            templateId 
+          }
+        );
 
         // Deduct coins atomically
         try {
