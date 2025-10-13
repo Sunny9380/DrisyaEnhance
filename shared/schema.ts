@@ -139,6 +139,23 @@ export const manualTransactions = pgTable("manual_transactions", {
   completedAt: timestamp("completed_at"), // When coins were credited
 });
 
+// Media Library - Store all processed images for user access and management
+export const mediaLibrary = pgTable("media_library", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  jobId: varchar("job_id").references(() => processingJobs.id), // Optional reference to processing job
+  imageId: varchar("image_id").references(() => images.id), // Optional reference to specific image
+  fileName: text("file_name").notNull(), // Original filename
+  processedUrl: text("processed_url").notNull(), // URL to processed image
+  thumbnailUrl: text("thumbnail_url"), // Optional thumbnail for faster loading
+  fileSize: integer("file_size"), // File size in bytes
+  dimensions: text("dimensions"), // e.g., "1080x1080"
+  templateUsed: text("template_used"), // Template name used for processing
+  tags: text("tags").array(), // User-defined tags for organization
+  isFavorite: boolean("is_favorite").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Zod schemas for validation
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -211,6 +228,11 @@ export const insertManualTransactionSchema = createInsertSchema(manualTransactio
   completedAt: true,
 });
 
+export const insertMediaLibrarySchema = createInsertSchema(mediaLibrary).omit({
+  id: true,
+  createdAt: true,
+});
+
 // TypeScript types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -244,3 +266,6 @@ export type CoinPackage = typeof coinPackages.$inferSelect;
 
 export type InsertManualTransaction = z.infer<typeof insertManualTransactionSchema>;
 export type ManualTransaction = typeof manualTransactions.$inferSelect;
+
+export type InsertMediaLibrary = z.infer<typeof insertMediaLibrarySchema>;
+export type MediaLibrary = typeof mediaLibrary.$inferSelect;
