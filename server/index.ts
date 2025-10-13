@@ -4,9 +4,33 @@ import connectPg from "connect-pg-simple";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { pool } from "./db";
+import { spawn } from "child_process";
+import path from "path";
 
 // Disable Replit proxy for localhost traffic to avoid "helium" DNS errors
 process.env.NO_PROXY = "localhost,127.0.0.1";
+
+// Start Python image processing service
+const pythonServicePath = path.join(process.cwd(), "python_services", "image_processor.py");
+const pythonProcess = spawn("python3", [pythonServicePath], {
+  cwd: path.join(process.cwd(), "python_services"),
+  env: { ...process.env },
+  stdio: ["ignore", "pipe", "pipe"]
+});
+
+pythonProcess.stdout?.on("data", (data) => {
+  log(`[Python Service] ${data.toString().trim()}`);
+});
+
+pythonProcess.stderr?.on("data", (data) => {
+  log(`[Python Service Error] ${data.toString().trim()}`);
+});
+
+pythonProcess.on("close", (code) => {
+  log(`[Python Service] Process exited with code ${code}`);
+});
+
+log("[Python Service] Starting image processing service on port 5001");
 
 const app = express();
 app.use(express.json());
