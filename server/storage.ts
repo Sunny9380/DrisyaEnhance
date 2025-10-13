@@ -14,6 +14,10 @@ import {
   type InsertTemplateFavorite,
   type AuditLog,
   type InsertAuditLog,
+  type CoinPackage,
+  type InsertCoinPackage,
+  type ManualTransaction,
+  type InsertManualTransaction,
   users,
   templates,
   processingJobs,
@@ -21,6 +25,8 @@ import {
   transactions,
   templateFavorites,
   auditLogs,
+  coinPackages,
+  manualTransactions,
 } from "@shared/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 
@@ -70,6 +76,23 @@ export interface IStorage {
   // Audit Logs - Security tracking for SaaS
   createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
   getUserAuditLogs(userId: string): Promise<AuditLog[]>;
+
+  // Coin Packages - Admin defines pricing
+  getAllCoinPackages(): Promise<CoinPackage[]>;
+  getActiveCoinPackages(): Promise<CoinPackage[]>;
+  getCoinPackage(id: string): Promise<CoinPackage | undefined>;
+  createCoinPackage(pkg: InsertCoinPackage): Promise<CoinPackage>;
+  updateCoinPackage(id: string, data: Partial<InsertCoinPackage>): Promise<void>;
+  deleteCoinPackage(id: string): Promise<void>;
+
+  // Manual Transactions - WhatsApp payment tracking
+  getAllManualTransactions(): Promise<ManualTransaction[]>;
+  getManualTransaction(id: string): Promise<ManualTransaction | undefined>;
+  getPendingManualTransactions(): Promise<ManualTransaction[]>;
+  getUserManualTransactions(userId: string): Promise<ManualTransaction[]>;
+  createManualTransaction(txn: InsertManualTransaction): Promise<ManualTransaction>;
+  approveManualTransaction(id: string, adminId: string, adminNotes?: string): Promise<void>;
+  rejectManualTransaction(id: string, adminId: string, adminNotes: string): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -259,6 +282,148 @@ export class DbStorage implements IStorage {
       .where(eq(auditLogs.userId, userId))
       .orderBy(desc(auditLogs.createdAt))
       .limit(100); // Last 100 audit logs
+  }
+
+  // Coin Packages - Admin defines pricing
+  async getAllCoinPackages(): Promise<CoinPackage[]> {
+    return await db
+      .select()
+      .from(coinPackages)
+      .orderBy(coinPackages.displayOrder, desc(coinPackages.createdAt));
+  }
+
+  async getActiveCoinPackages(): Promise<CoinPackage[]> {
+    return await db
+      .select()
+      .from(coinPackages)
+      .where(eq(coinPackages.isActive, true))
+      .orderBy(coinPackages.displayOrder);
+  }
+
+  async getCoinPackage(id: string): Promise<CoinPackage | undefined> {
+    const result = await db.select().from(coinPackages).where(eq(coinPackages.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createCoinPackage(pkg: InsertCoinPackage): Promise<CoinPackage> {
+    const result = await db.insert(coinPackages).values(pkg).returning();
+    return result[0];
+  }
+
+  async updateCoinPackage(id: string, data: Partial<InsertCoinPackage>): Promise<void> {
+    await db
+      .update(coinPackages)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(coinPackages.id, id));
+  }
+
+  async deleteCoinPackage(id: string): Promise<void> {
+    await db.delete(coinPackages).where(eq(coinPackages.id, id));
+  }
+
+  // Manual Transactions - WhatsApp payment tracking
+  async getAllManualTransactions(): Promise<ManualTransaction[]> {
+    return await db.select().from(manualTransactions).orderBy(desc(manualTransactions.createdAt));
+  }
+
+  async getManualTransaction(id: string): Promise<ManualTransaction | undefined> {
+    const result = await db
+      .select()
+      .from(manualTransactions)
+      .where(eq(manualTransactions.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async getPendingManualTransactions(): Promise<ManualTransaction[]> {
+    return await db
+      .select()
+      .from(manualTransactions)
+      .where(eq(manualTransactions.status, "pending"))
+      .orderBy(desc(manualTransactions.createdAt));
+  }
+
+  async getUserManualTransactions(userId: string): Promise<ManualTransaction[]> {
+    return await db
+      .select()
+      .from(manualTransactions)
+      .where(eq(manualTransactions.userId, userId))
+      .orderBy(desc(manualTransactions.createdAt));
+  }
+
+  async createManualTransaction(txn: InsertManualTransaction): Promise<ManualTransaction> {
+    const result = await db.insert(manualTransactions).values(txn).returning();
+    return result[0];
+  }
+
+  async approveManualTransaction(
+    id: string,
+    adminId: string,
+    adminNotes?: string
+  ): Promise<void> {
+    await db.transaction(async (tx) => {
+      // Get the manual transaction
+      const result = await tx
+        .select()
+        .from(manualTransactions)
+        .where(eq(manualTransactions.id, id))
+        .limit(1);
+
+      if (result.length === 0) {
+        throw new Error("Manual transaction not found");
+      }
+
+      const mtxn = result[0];
+
+      if (mtxn.status !== "pending") {
+        throw new Error("Transaction is not pending");
+      }
+
+      // Update user coins and create coin transaction
+      await tx
+        .update(users)
+        .set({ coinBalance: sql`${users.coinBalance} + ${mtxn.coinAmount}` })
+        .where(eq(users.id, mtxn.userId));
+
+      await tx.insert(transactions).values({
+        userId: mtxn.userId,
+        type: "purchase",
+        amount: mtxn.coinAmount,
+        description: `Manual coin purchase - ${mtxn.paymentMethod}`,
+        metadata: {
+          manualTransactionId: id,
+          paymentReference: mtxn.paymentReference,
+          adminId,
+        },
+      });
+
+      // Update manual transaction status
+      await tx
+        .update(manualTransactions)
+        .set({
+          status: "completed",
+          adminId,
+          adminNotes: adminNotes || mtxn.adminNotes,
+          approvedAt: new Date(),
+          completedAt: new Date(),
+        })
+        .where(eq(manualTransactions.id, id));
+    });
+  }
+
+  async rejectManualTransaction(
+    id: string,
+    adminId: string,
+    adminNotes: string
+  ): Promise<void> {
+    await db
+      .update(manualTransactions)
+      .set({
+        status: "rejected",
+        adminId,
+        adminNotes,
+      })
+      .where(eq(manualTransactions.id, id));
   }
 }
 

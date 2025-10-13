@@ -107,6 +107,38 @@ export const auditLogs = pgTable("audit_logs", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Coin Packages - Admin defines pricing packages (e.g., 100 coins = ₹500)
+export const coinPackages = pgTable("coin_packages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(), // e.g., "Starter Pack", "Professional Pack"
+  coinAmount: integer("coin_amount").notNull(), // Number of coins in the package
+  priceInINR: integer("price_in_inr").notNull(), // Price in Indian Rupees
+  discount: integer("discount").default(0), // Discount percentage (0-100)
+  description: text("description"), // e.g., "Best value for regular users"
+  isActive: boolean("is_active").notNull().default(true),
+  displayOrder: integer("display_order").notNull().default(0), // Sort order for display
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Manual Transactions - Track WhatsApp/manual payments and admin fulfillment
+export const manualTransactions = pgTable("manual_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  packageId: varchar("package_id").references(() => coinPackages.id), // Optional reference to package
+  coinAmount: integer("coin_amount").notNull(), // Coins to be credited
+  priceInINR: integer("price_in_inr").notNull(), // Amount paid by user
+  paymentMethod: text("payment_method").notNull().default("whatsapp"), // whatsapp, bank_transfer, upi, etc.
+  paymentReference: text("payment_reference"), // WhatsApp message ID, transaction ID, etc.
+  adminId: varchar("admin_id").references(() => users.id), // Admin who processed this
+  adminNotes: text("admin_notes"), // Admin's internal notes
+  userPhone: text("user_phone"), // Contact number for verification
+  status: text("status").notNull().default("pending"), // pending, approved, rejected, completed
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  approvedAt: timestamp("approved_at"), // When admin approved the payment
+  completedAt: timestamp("completed_at"), // When coins were credited
+});
+
 // Zod schemas for validation
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -165,6 +197,20 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
   createdAt: true,
 });
 
+export const insertCoinPackageSchema = createInsertSchema(coinPackages).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertManualTransactionSchema = createInsertSchema(manualTransactions).omit({
+  id: true,
+  status: true,
+  createdAt: true,
+  approvedAt: true,
+  completedAt: true,
+});
+
 // TypeScript types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -192,3 +238,9 @@ export type Referral = typeof referrals.$inferSelect;
 
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
+
+export type InsertCoinPackage = z.infer<typeof insertCoinPackageSchema>;
+export type CoinPackage = typeof coinPackages.$inferSelect;
+
+export type InsertManualTransaction = z.infer<typeof insertManualTransactionSchema>;
+export type ManualTransaction = typeof manualTransactions.$inferSelect;
