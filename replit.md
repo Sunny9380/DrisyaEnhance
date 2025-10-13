@@ -107,11 +107,15 @@ users {
 templates {
   id: UUID (primary key)
   name: text
-  category: text
+  category: text (jewelry, fashion, etc.)
+  backgroundStyle: text (velvet, marble, minimal, gradient, festive)
+  lightingPreset: text (moody, soft-glow, spotlight, studio)
   description: text
   thumbnailUrl: text
-  gradientColors: text[]
+  settings: jsonb (diffusionPrompt, shadowIntensity, vignetteStrength, colorGrading, gradientColors, etc.)
   isPremium: boolean
+  isActive: boolean
+  createdAt: timestamp
 }
 
 processingJobs {
@@ -180,26 +184,39 @@ templateFavorites {
 - tsx for TypeScript execution in development
 - Replit-specific plugins (runtime error overlay, cartographer, dev banner)
 
-### AI Image Processing Architecture
+### Advanced AI Image Processing Architecture
 
 **Python Service (Port 5001):**
-- Flask-based microservice for AI image processing
-- Background removal using color-based segmentation (placeholder for BiRefNet/U2-Net)
-- AI background generation from text prompts (gradient-based, upgradeable to Stable Diffusion)
-- Image compositing and 1080x1080px output generation
+- Flask-based microservice with professional-grade image processing
+- Background removal using color-based segmentation (upgradeable to BiRefNet/U2-Net)
+- **5 Background Styles:** Velvet texture, Marble texture, Minimal clean, Gradient, Festive (with bokeh/sparkle effects)
+- **4 Lighting Presets:** Moody (dark with vignette), Soft-glow (bright diffused), Spotlight (dramatic), Studio (professional even lighting)
+- **Advanced Effects:** Window-pane shadows, vignette control, color grading (warm/cool/dramatic/luxury), specular highlights
+- **Post-processing:** Auto-contrast, tone balance, sharpness enhancement, 1080x1080px output
 - RESTful API endpoints: `/process`, `/batch-process`, `/health`
 
 **Integration with Node.js Backend:**
-- Backend calls Python service via HTTP (axios)
+- Template settings fetched from database and passed to Python service
 - Base64 image encoding for data transfer
-- Async job processing with setTimeout for background tasks
+- Template-based processing: Node.js fetches template → extracts settings (backgroundStyle, lightingPreset, shadowIntensity, etc.) → sends to Python
+- Async job processing with background tasks
 - Processed images saved to `uploads/processed/` directory
 - Automatic ZIP creation for batch downloads
 
+**Template-Driven Processing Pipeline:**
+1. User selects premium template (e.g., "Dark Velvet Luxury" with moody lighting)
+2. Backend fetches template settings from database
+3. Settings sent to Python service: `{ backgroundStyle: "velvet", lightingPreset: "moody", shadowIntensity: 0.7, vignetteStrength: 0.3, colorGrading: "warm", gradientColors: [...] }`
+4. Python generates velvet texture → removes product background → composites → applies moody lighting → adds shadows → color grades → outputs 1080x1080px
+
 **Current Implementation:**
-- Simple color-based background removal (production-ready for BiRefNet upgrade)
-- Gradient generation from text descriptions (production-ready for Stable Diffusion upgrade)
-- No external API dependencies (fully self-hosted)
+- Velvet/marble textures using noise and procedural generation
+- Gradient and festive backgrounds with bokeh effects
+- Lighting simulation (brightness/contrast/vignette manipulation)
+- Window shadow rendering with gaussian blur
+- Color grading for warm/cool/dramatic tones
+- Fully self-hosted, no external API dependencies
+- Production-ready for BiRefNet (SOTA background removal) and Stable Diffusion (photorealistic backgrounds) upgrade
 
 ### Admin Features
 
@@ -230,7 +247,16 @@ templateFavorites {
 - No external API dependencies for image processing (self-hosted)
 - Google Fonts (Inter, JetBrains Mono)
 
-## Recent Updates (January 2025)
+## Recent Updates (October 2025)
+
+**Advanced AI Processing System:**
+- **Premium Template System:** 12 professional templates seeded with 5 background styles (velvet, marble, minimal, gradient, festive) and 4 lighting presets (moody, soft-glow, spotlight, studio)
+- **Enhanced Python Service:** Velvet/marble texture generation, lighting simulation, window shadows, vignette effects, color grading (warm/cool/dramatic/luxury)
+- **Template-Driven Pipeline:** Database stores template settings → Node.js fetches and passes to Python → Python applies all effects → outputs 1080x1080px professional images
+- **Template Gallery UI:** React Query-powered gallery with style filters, premium badges, lighting indicators, and color previews
+- **Production-Ready Architecture:** Upgradeable to BiRefNet (SOTA background removal) and Stable Diffusion (photorealistic AI backgrounds)
+
+**Previous Updates (January 2025):**
 
 **Self-Hosted AI Implementation:**
 - Python 3.11 service created for background removal and AI generation
@@ -243,3 +269,4 @@ templateFavorites {
 - Admin routes for user management (`/api/admin/users`, `/api/admin/users/:id/add-coins`)
 - Complete coin distribution workflow via manual WhatsApp confirmation
 - Atomic transaction system prevents race conditions
+- Security fix: Password hashes excluded from admin API responses
