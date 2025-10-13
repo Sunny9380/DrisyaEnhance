@@ -719,7 +719,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await fs.mkdir(path.join("uploads", "processed"), { recursive: true });
 
             // Process images in parallel batches for faster speed
-            const batchSize = 20; // Process 20 images at a time for high-speed bulk processing
+            const batchSize = 5; // Process 5 images at a time (balanced for stability and speed)
             for (let i = 0; i < jobImages.length; i += batchSize) {
               const batch = jobImages.slice(i, i + batchSize);
               
