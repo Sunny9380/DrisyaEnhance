@@ -5,6 +5,7 @@ import bcrypt from "bcrypt";
 import multer from "multer";
 import path from "path";
 import fs from "fs/promises";
+import { createWriteStream } from "fs";
 import archiver from "archiver";
 import axios from "axios";
 import AdmZip from "adm-zip";
@@ -773,7 +774,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const zipFileName = `job-${job.id}.zip`;
             const zipPath = path.join("uploads", "processed", zipFileName);
 
-            const output = require("fs").createWriteStream(zipPath);
+            const output = createWriteStream(zipPath);
             const archive = archiver("zip", { zlib: { level: 9 } });
 
             archive.pipe(output);
