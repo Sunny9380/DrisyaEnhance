@@ -1,15 +1,37 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Link } from "wouter";
+import { useLocation } from "wouter";
 import { Crown, Sparkles, Palette, Sun, Star } from "lucide-react";
 import type { Template } from "@shared/schema";
 
 export default function Templates() {
+  const [, setLocation] = useLocation();
   const [selectedTemplate, setSelectedTemplate] = useState<string>();
   const [styleFilter, setStyleFilter] = useState<string>("all");
+
+  // Load previously selected template from localStorage
+  useEffect(() => {
+    const savedTemplateId = localStorage.getItem('selectedTemplateId');
+    if (savedTemplateId) {
+      setSelectedTemplate(savedTemplateId);
+    }
+  }, []);
+
+  // Handle template selection (save immediately)
+  const handleSelectTemplate = (templateId: string) => {
+    setSelectedTemplate(templateId);
+    localStorage.setItem('selectedTemplateId', templateId);
+  };
+
+  // Handle navigation to upload page
+  const handleUseTemplate = () => {
+    if (selectedTemplate) {
+      setLocation('/upload');
+    }
+  };
 
   // Fetch templates from API
   const { data: templates, isLoading } = useQuery<{ templates: Template[] }>({
@@ -57,11 +79,13 @@ export default function Templates() {
           </p>
         </div>
         {selectedTemplate && (
-          <Link href="/upload">
-            <Button size="lg" data-testid="button-use-template">
-              Use Template
-            </Button>
-          </Link>
+          <Button 
+            size="lg" 
+            onClick={handleUseTemplate}
+            data-testid="button-use-template"
+          >
+            Use Template
+          </Button>
         )}
       </div>
 
@@ -105,7 +129,7 @@ export default function Templates() {
               className={`group cursor-pointer transition-all hover-elevate active-elevate-2 ${
                 selectedTemplate === template.id ? 'ring-2 ring-primary' : ''
               }`}
-              onClick={() => setSelectedTemplate(template.id)}
+              onClick={() => handleSelectTemplate(template.id)}
               data-testid={`template-card-${template.id}`}
             >
               <div className="p-4 space-y-3">

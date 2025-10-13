@@ -12,12 +12,15 @@ import {
   type InsertTransaction,
   type TemplateFavorite,
   type InsertTemplateFavorite,
+  type AuditLog,
+  type InsertAuditLog,
   users,
   templates,
   processingJobs,
   images,
   transactions,
   templateFavorites,
+  auditLogs,
 } from "@shared/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 
@@ -63,6 +66,10 @@ export interface IStorage {
   addTemplateFavorite(userId: string, templateId: string): Promise<TemplateFavorite>;
   removeTemplateFavorite(userId: string, templateId: string): Promise<void>;
   getUserFavorites(userId: string): Promise<TemplateFavorite[]>;
+
+  // Audit Logs - Security tracking for SaaS
+  createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
+  getUserAuditLogs(userId: string): Promise<AuditLog[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -237,6 +244,21 @@ export class DbStorage implements IStorage {
       .select()
       .from(templateFavorites)
       .where(eq(templateFavorites.userId, userId));
+  }
+
+  // Audit Logs - Security tracking for SaaS
+  async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
+    const result = await db.insert(auditLogs).values(log).returning();
+    return result[0];
+  }
+
+  async getUserAuditLogs(userId: string): Promise<AuditLog[]> {
+    return await db
+      .select()
+      .from(auditLogs)
+      .where(eq(auditLogs.userId, userId))
+      .orderBy(desc(auditLogs.createdAt))
+      .limit(100); // Last 100 audit logs
   }
 }
 

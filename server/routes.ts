@@ -11,6 +11,37 @@ import { insertUserSchema, insertProcessingJobSchema } from "@shared/schema";
 
 const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || "http://localhost:5001";
 
+// Helper function to log audit events (IP tracking for SaaS security)
+async function logAudit(
+  userId: string | undefined,
+  action: string,
+  ipAddress: string,
+  userAgent: string | undefined,
+  metadata?: any
+) {
+  try {
+    await storage.createAuditLog({
+      userId: userId || null,
+      action,
+      ipAddress,
+      userAgent: userAgent || null,
+      metadata: metadata || null,
+    });
+  } catch (error) {
+    console.error("Failed to log audit event:", error);
+  }
+}
+
+// Helper function to extract IP address from request
+function getClientIP(req: Request): string {
+  return (
+    (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() ||
+    (req.headers['x-real-ip'] as string) ||
+    req.socket.remoteAddress ||
+    'unknown'
+  );
+}
+
 // Helper function to process image with Python AI service
 async function processImageWithAI(
   imagePath: string,
@@ -107,6 +138,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       req.session.userId = user.id;
+
+      // Log login for security audit (SaaS requirement)
+      await logAudit(
+        user.id,
+        'login',
+        getClientIP(req),
+        req.headers['user-agent'],
+        { email: user.email }
+      );
 
       res.json({
         user: { id: user.id, email: user.email, name: user.name, coinBalance: user.coinBalance, role: user.role },

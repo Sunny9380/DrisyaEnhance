@@ -96,6 +96,17 @@ export const referrals = pgTable("referrals", {
   completedAt: timestamp("completed_at"),
 });
 
+// Security Audit Logs - Track IP addresses and user actions for SaaS security
+export const auditLogs = pgTable("audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id), // nullable for anonymous actions
+  action: text("action").notNull(), // login, logout, upload, process, download, etc.
+  ipAddress: text("ip_address").notNull(),
+  userAgent: text("user_agent"),
+  metadata: jsonb("metadata"), // Additional context (template_id, job_id, file_count, etc.)
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Zod schemas for validation
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -149,6 +160,11 @@ export const insertReferralSchema = createInsertSchema(referrals).omit({
   completedAt: true,
 });
 
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
 // TypeScript types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -173,3 +189,6 @@ export type TeamMember = typeof teamMembers.$inferSelect;
 
 export type InsertReferral = z.infer<typeof insertReferralSchema>;
 export type Referral = typeof referrals.$inferSelect;
+
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+export type AuditLog = typeof auditLogs.$inferSelect;
