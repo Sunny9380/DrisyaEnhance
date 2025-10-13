@@ -24,7 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Users, Image, Settings as SettingsIcon, Phone, Coins, Plus } from "lucide-react";
+import { Upload, Users, Image, Settings as SettingsIcon, Phone, Coins, Plus, CreditCard, Check, X } from "lucide-react";
 
 interface User {
   id: string;
@@ -418,6 +418,366 @@ function CoinPackagesTab() {
   );
 }
 
+interface ManualTransaction {
+  id: string;
+  userId: string;
+  packageId: string | null;
+  coinAmount: number;
+  priceInINR: number;
+  paymentMethod: string;
+  paymentReference: string | null;
+  adminId: string | null;
+  adminNotes: string | null;
+  userPhone: string | null;
+  status: string;
+  createdAt: string;
+  approvedAt: string | null;
+  completedAt: string | null;
+  user?: { email: string; name: string };
+  package?: { name: string };
+}
+
+function ManualPaymentsTab() {
+  const { toast } = useToast();
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [selectedTxn, setSelectedTxn] = useState<ManualTransaction | null>(null);
+  const [formData, setFormData] = useState({
+    userId: "",
+    packageId: "",
+    coinAmount: "",
+    priceInINR: "",
+    paymentMethod: "whatsapp",
+    paymentReference: "",
+    userPhone: "",
+  });
+
+  const { data: txnsData, isLoading } = useQuery<{ transactions: ManualTransaction[] }>({
+    queryKey: ["/api/admin/manual-transactions"],
+  });
+
+  const { data: usersData } = useQuery<{ users: User[] }>({
+    queryKey: ["/api/admin/users"],
+  });
+
+  const { data: packagesData } = useQuery<{ packages: CoinPackage[] }>({
+    queryKey: ["/api/admin/coin-packages"],
+  });
+
+  const transactions = txnsData?.transactions || [];
+  const users = usersData?.users || [];
+  const packages = packagesData?.packages || [];
+
+  const createTxnMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await apiRequest("/api/admin/manual-transactions", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/manual-transactions"] });
+      toast({ title: "✅ Payment logged successfully" });
+      resetForm();
+      setIsCreateOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "❌ Failed to log payment", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const approveTxnMutation = useMutation({
+    mutationFn: async ({ id, notes }: { id: string; notes?: string }) => {
+      return await apiRequest(`/api/admin/manual-transactions/${id}/approve`, {
+        method: "POST",
+        body: JSON.stringify({ adminNotes: notes }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/manual-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "✅ Payment approved and coins credited" });
+      setSelectedTxn(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "❌ Failed to approve payment", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const rejectTxnMutation = useMutation({
+    mutationFn: async ({ id, notes }: { id: string; notes: string }) => {
+      return await apiRequest(`/api/admin/manual-transactions/${id}/reject`, {
+        method: "POST",
+        body: JSON.stringify({ adminNotes: notes }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/manual-transactions"] });
+      toast({ title: "✅ Payment rejected" });
+      setSelectedTxn(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "❌ Failed to reject payment", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const resetForm = () => {
+    setFormData({
+      userId: "",
+      packageId: "",
+      coinAmount: "",
+      priceInINR: "",
+      paymentMethod: "whatsapp",
+      paymentReference: "",
+      userPhone: "",
+    });
+  };
+
+  const handleSubmit = () => {
+    const data = {
+      userId: formData.userId,
+      packageId: formData.packageId || null,
+      coinAmount: parseInt(formData.coinAmount),
+      priceInINR: parseInt(formData.priceInINR),
+      paymentMethod: formData.paymentMethod,
+      paymentReference: formData.paymentReference || null,
+      userPhone: formData.userPhone || null,
+    };
+
+    createTxnMutation.mutate(data);
+  };
+
+  const pendingTxns = transactions.filter(t => t.status === "pending");
+  const allTxns = transactions;
+
+  return (
+    <>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">Manual Payment Management</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Log WhatsApp/UPI payments and credit coins to users
+          </p>
+        </div>
+        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <DialogTrigger asChild>
+            <Button data-testid="button-log-payment">
+              <Plus className="w-4 h-4 mr-2" />
+              Log Payment
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Log Manual Payment</DialogTitle>
+              <DialogDescription>Record WhatsApp/UPI payment and create pending approval</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>User</Label>
+                <select
+                  className="w-full p-2 border rounded"
+                  value={formData.userId}
+                  onChange={(e) => setFormData({ ...formData, userId: e.target.value })}
+                  data-testid="select-user"
+                >
+                  <option value="">Select User</option>
+                  {users.map(u => (
+                    <option key={u.id} value={u.id}>{u.email} - {u.name || "No name"}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Package (Optional)</Label>
+                <select
+                  className="w-full p-2 border rounded"
+                  value={formData.packageId}
+                  onChange={(e) => {
+                    const pkg = packages.find(p => p.id === e.target.value);
+                    setFormData({
+                      ...formData,
+                      packageId: e.target.value,
+                      coinAmount: pkg?.coinAmount.toString() || formData.coinAmount,
+                      priceInINR: pkg?.priceInINR.toString() || formData.priceInINR,
+                    });
+                  }}
+                  data-testid="select-package"
+                >
+                  <option value="">Custom Amount</option>
+                  {packages.filter(p => p.isActive).map(p => (
+                    <option key={p.id} value={p.id}>{p.name} - {p.coinAmount} coins for ₹{p.priceInINR}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Coin Amount</Label>
+                  <Input
+                    type="number"
+                    placeholder="100"
+                    value={formData.coinAmount}
+                    onChange={(e) => setFormData({ ...formData, coinAmount: e.target.value })}
+                    data-testid="input-coin-amount"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Amount Paid (₹)</Label>
+                  <Input
+                    type="number"
+                    placeholder="500"
+                    value={formData.priceInINR}
+                    onChange={(e) => setFormData({ ...formData, priceInINR: e.target.value })}
+                    data-testid="input-price-paid"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Payment Method</Label>
+                <select
+                  className="w-full p-2 border rounded"
+                  value={formData.paymentMethod}
+                  onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
+                  data-testid="select-payment-method"
+                >
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="upi">UPI</option>
+                  <option value="bank_transfer">Bank Transfer</option>
+                  <option value="cash">Cash</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Payment Reference (Optional)</Label>
+                <Input
+                  placeholder="Transaction ID / Screenshot reference"
+                  value={formData.paymentReference}
+                  onChange={(e) => setFormData({ ...formData, paymentReference: e.target.value })}
+                  data-testid="input-payment-ref"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>User Phone (Optional)</Label>
+                <Input
+                  placeholder="+91XXXXXXXXXX"
+                  value={formData.userPhone}
+                  onChange={(e) => setFormData({ ...formData, userPhone: e.target.value })}
+                  data-testid="input-user-phone"
+                />
+              </div>
+              <Button onClick={handleSubmit} className="w-full" disabled={createTxnMutation.isPending}>
+                {createTxnMutation.isPending ? "Logging..." : "Log Payment (Pending Approval)"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <Card className="p-4 bg-yellow-50 dark:bg-yellow-900/20">
+        <h3 className="font-semibold mb-2">Pending Approvals ({pendingTxns.length})</h3>
+        {pendingTxns.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No pending payments</p>
+        ) : (
+          <div className="space-y-2">
+            {pendingTxns.map(txn => (
+              <div key={txn.id} className="flex items-center justify-between p-3 bg-background rounded border">
+                <div>
+                  <div className="font-medium">{txn.user?.email || `User ${txn.userId}`}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {txn.coinAmount} coins • ₹{txn.priceInINR} • {txn.paymentMethod}
+                    {txn.paymentReference && ` • Ref: ${txn.paymentReference}`}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => approveTxnMutation.mutate({ id: txn.id })}
+                    disabled={approveTxnMutation.isPending}
+                    data-testid={`button-approve-${txn.id}`}
+                  >
+                    <Check className="h-3 w-3 mr-1" />
+                    Approve
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const notes = prompt("Reason for rejection:");
+                      if (notes) rejectTxnMutation.mutate({ id: txn.id, notes });
+                    }}
+                    disabled={rejectTxnMutation.isPending}
+                    data-testid={`button-reject-${txn.id}`}
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Reject
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <Card>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>User</TableHead>
+              <TableHead>Coins / Amount</TableHead>
+              <TableHead>Method</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Date</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {allTxns.map(txn => (
+              <TableRow key={txn.id} data-testid={`row-txn-${txn.id}`}>
+                <TableCell>
+                  <div>
+                    <div className="font-medium">{txn.user?.email || `User ${txn.userId}`}</div>
+                    {txn.userPhone && (
+                      <div className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Phone className="h-3 w-3" />
+                        {txn.userPhone}
+                      </div>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-1">
+                    <Coins className="h-4 w-4 text-yellow-600" />
+                    <span className="font-mono">{txn.coinAmount}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">₹{txn.priceInINR}</div>
+                </TableCell>
+                <TableCell>
+                  <div>{txn.paymentMethod}</div>
+                  {txn.paymentReference && (
+                    <div className="text-xs text-muted-foreground">Ref: {txn.paymentReference}</div>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    variant={
+                      txn.status === "completed" ? "default" :
+                      txn.status === "pending" ? "secondary" :
+                      "destructive"
+                    }
+                  >
+                    {txn.status}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <div className="text-sm">{new Date(txn.createdAt).toLocaleDateString()}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {new Date(txn.createdAt).toLocaleTimeString()}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Card>
+    </>
+  );
+}
+
 export default function Admin() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("users");
@@ -497,14 +857,18 @@ export default function Admin() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="users" data-testid="tab-users">
             <Users className="w-4 h-4 mr-2" />
-            User Coins (WhatsApp)
+            Users
           </TabsTrigger>
           <TabsTrigger value="packages" data-testid="tab-packages">
             <Coins className="w-4 h-4 mr-2" />
-            Coin Packages
+            Packages
+          </TabsTrigger>
+          <TabsTrigger value="payments" data-testid="tab-payments">
+            <CreditCard className="w-4 h-4 mr-2" />
+            Payments
           </TabsTrigger>
           <TabsTrigger value="templates" data-testid="tab-templates">
             <Image className="w-4 h-4 mr-2" />
@@ -666,6 +1030,10 @@ export default function Admin() {
 
         <TabsContent value="packages" className="space-y-4">
           <CoinPackagesTab />
+        </TabsContent>
+
+        <TabsContent value="payments" className="space-y-4">
+          <ManualPaymentsTab />
         </TabsContent>
 
         <TabsContent value="templates" className="space-y-4">

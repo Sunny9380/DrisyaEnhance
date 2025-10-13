@@ -7,7 +7,7 @@ import path from "path";
 import fs from "fs/promises";
 import archiver from "archiver";
 import axios from "axios";
-import { insertUserSchema, insertProcessingJobSchema, insertCoinPackageSchema } from "@shared/schema";
+import { insertUserSchema, insertProcessingJobSchema, insertCoinPackageSchema, insertManualTransactionSchema } from "@shared/schema";
 
 const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || "http://localhost:5001";
 
@@ -323,6 +323,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       await storage.deleteCoinPackage(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // ============== Manual Transaction Routes (Admin) ==============
+
+  // Get all manual transactions (admin only)
+  app.get("/api/admin/manual-transactions", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const currentUser = await storage.getUser(req.session.userId);
+      if (currentUser?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const transactions = await storage.getAllManualTransactions();
+      
+      // Enrich with user data
+      const enrichedTxns = await Promise.all(
+        transactions.map(async (txn) => {
+          const user = await storage.getUser(txn.userId);
+          const pkg = txn.packageId ? await storage.getCoinPackage(txn.packageId) : null;
+          return {
+            ...txn,
+            user: user ? { email: user.email, name: user.name } : null,
+            package: pkg ? { name: pkg.name } : null,
+          };
+        })
+      );
+
+      res.json({ transactions: enrichedTxns });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create manual transaction (admin only)
+  app.post("/api/admin/manual-transactions", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const currentUser = await storage.getUser(req.session.userId);
+      if (currentUser?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const txnData = insertManualTransactionSchema.parse(req.body);
+      const newTxn = await storage.createManualTransaction(txnData);
+      res.json({ transaction: newTxn });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Approve manual transaction (admin only)
+  app.post("/api/admin/manual-transactions/:id/approve", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const currentUser = await storage.getUser(req.session.userId);
+      if (currentUser?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { adminNotes } = req.body;
+      await storage.approveManualTransaction(req.params.id, req.session.userId, adminNotes);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Reject manual transaction (admin only)
+  app.post("/api/admin/manual-transactions/:id/reject", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const currentUser = await storage.getUser(req.session.userId);
+      if (currentUser?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { adminNotes } = req.body;
+      if (!adminNotes) {
+        return res.status(400).json({ message: "Admin notes required for rejection" });
+      }
+
+      await storage.rejectManualTransaction(req.params.id, req.session.userId, adminNotes);
       res.json({ success: true });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
