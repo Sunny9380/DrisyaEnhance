@@ -24,7 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Users, Image, Settings as SettingsIcon, Phone, Coins, Plus, CreditCard, Check, X } from "lucide-react";
+import { Upload, Users, Image, Settings as SettingsIcon, Phone, Coins, Plus, CreditCard, Check, X, TrendingUp, DollarSign } from "lucide-react";
 
 interface User {
   id: string;
@@ -778,9 +778,123 @@ function ManualPaymentsTab() {
   );
 }
 
+interface AnalyticsData {
+  revenue: {
+    total: number;
+    thisMonth: number;
+    transactionCount: number;
+  };
+  coins: {
+    sold: number;
+    active: number;
+  };
+  users: {
+    total: number;
+    thisMonth: number;
+  };
+  transactions: any[];
+}
+
+function AnalyticsTab() {
+  const { data: analyticsData, isLoading } = useQuery<AnalyticsData>({
+    queryKey: ["/api/admin/analytics"],
+  });
+
+  const analytics = analyticsData || {
+    revenue: { total: 0, thisMonth: 0, transactionCount: 0 },
+    coins: { sold: 0, active: 0 },
+    users: { total: 0, thisMonth: 0 },
+    transactions: [],
+  };
+
+  return (
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm text-muted-foreground">Total Revenue</p>
+            <DollarSign className="h-5 w-5 text-green-600" />
+          </div>
+          <div className="text-3xl font-bold font-mono">₹{analytics.revenue.total.toLocaleString()}</div>
+          <p className="text-xs text-muted-foreground mt-1">
+            ₹{analytics.revenue.thisMonth.toLocaleString()} this month
+          </p>
+        </Card>
+
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm text-muted-foreground">Coins Sold</p>
+            <Coins className="h-5 w-5 text-yellow-600" />
+          </div>
+          <div className="text-3xl font-bold font-mono">{analytics.coins.sold.toLocaleString()}</div>
+          <p className="text-xs text-muted-foreground mt-1">
+            {analytics.coins.active.toLocaleString()} active in wallets
+          </p>
+        </Card>
+
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm text-muted-foreground">Total Users</p>
+            <Users className="h-5 w-5 text-blue-600" />
+          </div>
+          <div className="text-3xl font-bold font-mono">{analytics.users.total}</div>
+          <p className="text-xs text-muted-foreground mt-1">
+            +{analytics.users.thisMonth} this month
+          </p>
+        </Card>
+
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm text-muted-foreground">Transactions</p>
+            <CreditCard className="h-5 w-5 text-purple-600" />
+          </div>
+          <div className="text-3xl font-bold font-mono">{analytics.revenue.transactionCount}</div>
+          <p className="text-xs text-muted-foreground mt-1">Completed payments</p>
+        </Card>
+      </div>
+
+      <Card>
+        <div className="p-6">
+          <h3 className="text-lg font-semibold mb-4">Recent Transactions</h3>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Coins</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Method</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {analytics.transactions.map((txn) => (
+                <TableRow key={txn.id}>
+                  <TableCell>{new Date(txn.createdAt).toLocaleDateString()}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      <Coins className="h-4 w-4 text-yellow-600" />
+                      {txn.coinAmount}
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-mono">₹{txn.priceInINR}</TableCell>
+                  <TableCell>{txn.paymentMethod}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          {analytics.transactions.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground">
+              No transactions yet
+            </div>
+          )}
+        </div>
+      </Card>
+    </>
+  );
+}
+
 export default function Admin() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("users");
+  const [activeTab, setActiveTab] = useState("analytics");
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [coinAmount, setCoinAmount] = useState("");
   const [description, setDescription] = useState("");
@@ -857,7 +971,11 @@ export default function Admin() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
+          <TabsTrigger value="analytics" data-testid="tab-analytics">
+            <TrendingUp className="w-4 h-4 mr-2" />
+            Analytics
+          </TabsTrigger>
           <TabsTrigger value="users" data-testid="tab-users">
             <Users className="w-4 h-4 mr-2" />
             Users
@@ -879,6 +997,10 @@ export default function Admin() {
             Settings
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="analytics" className="space-y-4">
+          <AnalyticsTab />
+        </TabsContent>
 
         <TabsContent value="users" className="space-y-4">
           <div className="flex items-center justify-between">

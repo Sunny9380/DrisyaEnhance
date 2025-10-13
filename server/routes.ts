@@ -428,6 +428,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============== Admin Analytics Routes ==============
+
+  // Get admin analytics dashboard data
+  app.get("/api/admin/analytics", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const currentUser = await storage.getUser(req.session.userId);
+      if (currentUser?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      // Get all transactions for revenue calculation
+      const transactions = await storage.getAllManualTransactions();
+      const completedTxns = transactions.filter(t => t.status === "completed");
+      
+      const totalRevenue = completedTxns.reduce((sum, t) => sum + t.priceInINR, 0);
+      const totalCoinsSold = completedTxns.reduce((sum, t) => sum + t.coinAmount, 0);
+
+      // Get all jobs for usage statistics
+      const allUsers = await storage.getAllUsers();
+      const totalCoinsSpent = allUsers.reduce((sum, u) => {
+        const spent = (u.coinBalance || 0); // This would need transaction history
+        return sum;
+      }, 0);
+
+      // Get template usage stats
+      const templates = await storage.getAllTemplates();
+      const jobs = (await storage.getUserJobs(req.session.userId)); // Would need all jobs
+      
+      // Get user stats
+      const usersThisMonth = allUsers.filter(u => {
+        const createdAt = new Date(u.createdAt);
+        const now = new Date();
+        return createdAt.getMonth() === now.getMonth() && 
+               createdAt.getFullYear() === now.getFullYear();
+      }).length;
+
+      res.json({
+        revenue: {
+          total: totalRevenue,
+          thisMonth: completedTxns.filter(t => {
+            const created = new Date(t.createdAt);
+            const now = new Date();
+            return created.getMonth() === now.getMonth() && 
+                   created.getFullYear() === now.getFullYear();
+          }).reduce((sum, t) => sum + t.priceInINR, 0),
+          transactionCount: completedTxns.length,
+        },
+        coins: {
+          sold: totalCoinsSold,
+          active: allUsers.reduce((sum, u) => sum + (u.coinBalance || 0), 0),
+        },
+        users: {
+          total: allUsers.length,
+          thisMonth: usersThisMonth,
+        },
+        transactions: completedTxns.slice(0, 10), // Recent 10
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ============== Wallet Routes (User) ==============
 
   // Get active coin packages for purchase (user-facing)
