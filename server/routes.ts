@@ -43,36 +43,67 @@ function getClientIP(req: Request): string {
 }
 
 // Helper function to process image with Python AI service
+// Create Axios client with proxy disabled for localhost to avoid "helium" DNS errors
+const aiServiceClient = axios.create({
+  baseURL: PYTHON_SERVICE_URL,
+  proxy: false,
+  timeout: 30000,
+});
+
 async function processImageWithAI(
   imagePath: string,
   templateSettings: any
 ): Promise<string> {
-  try {
-    // Read image file
-    const imageBuffer = await fs.readFile(imagePath);
-    const imageBase64 = imageBuffer.toString("base64");
+  const maxRetries = 3;
+  let lastError: any;
 
-    // Call Python service with advanced template settings
-    const response = await axios.post(`${PYTHON_SERVICE_URL}/process`, {
-      image: imageBase64,
-      template_settings: templateSettings,
-      remove_background: true,
-    }, {
-      timeout: 30000, // 30 second timeout
-    });
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      // Read image file
+      const imageBuffer = await fs.readFile(imagePath);
+      const imageBase64 = imageBuffer.toString("base64");
 
-    if (!response.data.success) {
-      throw new Error(response.data.error || "Processing failed");
+      // Call Python service with advanced template settings
+      const response = await aiServiceClient.post('/process', {
+        image: imageBase64,
+        template_settings: templateSettings,
+        remove_background: true,
+      });
+
+      if (!response.data.success) {
+        throw new Error(response.data.error || "Processing failed");
+      }
+
+      // Return processed image as base64
+      return response.data.image;
+    } catch (error: any) {
+      lastError = error;
+      
+      // Log error with context
+      console.error(`AI service call attempt ${attempt}/${maxRetries} failed:`, {
+        code: error.code,
+        message: error.message,
+        url: PYTHON_SERVICE_URL,
+      });
+
+      // Don't retry on certain errors
+      if (error.response?.status === 400) {
+        throw new Error("Invalid image or template settings");
+      }
+
+      // If not last attempt, wait with exponential backoff
+      if (attempt < maxRetries) {
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1) + Math.random() * 1000, 5000);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
     }
-
-    // Return processed image as base64
-    return response.data.image;
-  } catch (error: any) {
-    if (error.code === "ECONNREFUSED") {
-      throw new Error("Image processing service is not running. Please start the Python service.");
-    }
-    throw error;
   }
+
+  // All retries failed
+  if (lastError?.code === "ECONNREFUSED") {
+    throw new Error("Image processing service is not running. Please start the Python service.");
+  }
+  throw new Error(`AI service failed after ${maxRetries} attempts: ${lastError?.message || 'Unknown error'}`);
 }
 
 // Configure multer for file uploads

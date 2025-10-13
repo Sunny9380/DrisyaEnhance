@@ -5,6 +5,9 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { pool } from "./db";
 
+// Disable Replit proxy for localhost traffic to avoid "helium" DNS errors
+process.env.NO_PROXY = "localhost,127.0.0.1";
+
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));

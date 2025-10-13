@@ -35,14 +35,15 @@ Preferred communication style: Simple, everyday language.
 
 **Python Service:** Flask-based microservice (Port 5001) for professional image processing.
 **Capabilities:** AI-powered background removal, 5 background styles (Velvet, Marble, Minimal, Gradient, Festive), 4 lighting presets (Moody, Soft-glow, Spotlight, Studio), advanced effects (window-pane shadows, vignette, color grading, specular highlights), and post-processing (auto-contrast, tone balance, sharpness, 1080x1080px output).
-**Integration:** Node.js backend passes template settings to the Python service via Base64 image encoding for processing. Supports asynchronous job processing and automatic ZIP creation for batch downloads.
+**Integration:** Node.js backend passes template settings to the Python service via Base64 image encoding for processing. Supports asynchronous job processing and automatic ZIP creation for batch downloads. Uses custom Axios client with proxy bypass (`proxy: false`) and retry logic (3 attempts with exponential backoff) to avoid Replit's "helium" proxy DNS errors for localhost traffic.
 **Template-Driven Pipeline:** Database-stored template settings guide the Python service to apply specific background styles, lighting, and effects.
 **Implementation:** Self-hosted with procedural generation for textures, lighting simulation, and color grading. Architected for future upgrades to SOTA models like BiRefNet and Stable Diffusion.
 
 ### Admin Features
 
-**Coin Management:** Admin panel (`/admin`) for managing user coins, coin packages, and manual payment approvals.
-**Workflow:** Admins can view users, add coins to accounts, track transactions, and manage coin packages. A manual payment system allows logging and approving WhatsApp/UPI/bank transfer payments, crediting coins atomically.
+**Admin Panel:** Comprehensive admin dashboard at `/admin` with 6 tabs: Analytics (default), Users, Packages, Payments, Templates, and Settings.
+**Analytics Dashboard:** Real-time metrics showing total revenue, coins sold/active, user growth, and transaction count. Displays recent transactions with payment method details.
+**Coin Management:** Add coins to user accounts, track transactions, and manage coin packages. Manual payment system allows logging and approving WhatsApp/UPI/bank transfer payments with atomic coin crediting and status gating to prevent double-approval.
 **User Wallet:** Users can view coin packages and initiate WhatsApp-based purchase flows, tracking pending approvals and payment history.
 
 ## External Dependencies
