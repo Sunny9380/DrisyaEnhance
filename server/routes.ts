@@ -428,6 +428,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============== Wallet Routes (User) ==============
+
+  // Get active coin packages for purchase (user-facing)
+  app.get("/api/wallet/packages", async (req: Request, res: Response) => {
+    try {
+      const packages = await storage.getActiveCoinPackages();
+      res.json({ packages });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get user's manual transactions (user-facing)
+  app.get("/api/wallet/transactions", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const transactions = await storage.getUserManualTransactions(req.session.userId);
+      res.json({ transactions });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ============== Template Routes ==============
 
   // Get all templates
