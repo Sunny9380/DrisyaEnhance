@@ -1,59 +1,176 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import UploadDropzone from "@/components/UploadDropzone";
-import TemplateCard from "@/components/TemplateCard";
 import BatchEditPanel from "@/components/BatchEditPanel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Info, Coins } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
+import { Info, Coins, Sparkles } from "lucide-react";
+import type { Template } from "@shared/schema";
 
 export default function Upload() {
-  const [selectedTemplate, setSelectedTemplate] = useState<string>("1");
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>();
   const [files, setFiles] = useState<File[]>([]);
+  const [batchSettings, setBatchSettings] = useState({
+    brightness: 0,
+    contrast: 0,
+    saturation: 0,
+    sharpness: 0,
+    quality: "standard",
+  });
 
-  const mockTemplates = [
-    { id: "1", name: "Premium Dark Fabric", category: "Elegant" },
-    { id: "2", name: "White Studio", category: "Studio" },
-    { id: "3", name: "Blue Gradient", category: "Minimal" },
-    { id: "4", name: "Rose Gold", category: "Elegant" },
-  ];
+  // Load selected template from localStorage
+  useEffect(() => {
+    const savedTemplateId = localStorage.getItem('selectedTemplateId');
+    if (savedTemplateId) {
+      setSelectedTemplateId(savedTemplateId);
+    }
+  }, []);
+
+  // Fetch templates from database
+  const { data: templatesData } = useQuery<{ templates: Template[] }>({
+    queryKey: ["/api/templates"],
+  });
+
+  const templates = templatesData?.templates || [];
+  const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
 
   const estimatedCoins = files.length * 2;
+
+  // Create processing job mutation
+  const createJobMutation = useMutation({
+    mutationFn: async (formData: FormData) => {
+      return await apiRequest("/api/jobs", {
+        method: "POST",
+        body: formData,
+      });
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "✅ Processing started!",
+        description: `Job created with ${files.length} images`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      setFiles([]);
+      localStorage.removeItem('selectedTemplateId');
+      setLocation('/history');
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "❌ Failed to create job",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleStartProcessing = async () => {
+    if (!selectedTemplateId) {
+      toast({
+        title: "No template selected",
+        description: "Please select a template first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (files.length === 0) {
+      toast({
+        title: "No files selected",
+        description: "Please upload at least one image",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("templateId", selectedTemplateId);
+    formData.append("batchSettings", JSON.stringify(batchSettings));
+    
+    files.forEach((file) => {
+      formData.append("images", file);
+    });
+
+    createJobMutation.mutate(formData);
+  };
 
   return (
     <div className="space-y-8" data-testid="page-upload">
       <div>
         <h1 className="text-3xl font-bold mb-2">Upload & Process</h1>
         <p className="text-muted-foreground">
-          Select a template and upload your images for processing
+          Upload your images for AI-powered background enhancement
         </p>
       </div>
 
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold">Step 1: Select Template</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {mockTemplates.map((template) => (
-            <TemplateCard
-              key={template.id}
-              {...template}
-              isSelected={selectedTemplate === template.id}
-              onClick={() => setSelectedTemplate(template.id)}
-            />
-          ))}
-        </div>
-      </div>
+      {/* Selected Template Display */}
+      {selectedTemplate && (
+        <Card className="p-4">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <h3 className="font-semibold">{selectedTemplate.name}</h3>
+                {selectedTemplate.isPremium && (
+                  <Badge variant="default" className="gap-1">
+                    <Sparkles className="w-3 h-3" />
+                    Premium
+                  </Badge>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground">{selectedTemplate.description}</p>
+              <div className="flex gap-2 mt-2">
+                <Badge variant="outline">{selectedTemplate.category}</Badge>
+                <Badge variant="outline">{selectedTemplate.backgroundStyle}</Badge>
+                <Badge variant="outline">{selectedTemplate.lightingPreset}</Badge>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setLocation('/templates')}
+              data-testid="button-change-template"
+            >
+              Change Template
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {!selectedTemplate && (
+        <Alert>
+          <Info className="w-4 h-4" />
+          <AlertDescription>
+            No template selected. Please{" "}
+            <Button
+              variant="link"
+              className="p-0 h-auto"
+              onClick={() => setLocation('/templates')}
+              data-testid="link-select-template"
+            >
+              select a template
+            </Button>{" "}
+            first.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold">Step 2: Upload Images</h2>
+        <h2 className="text-lg font-semibold">Upload Images</h2>
         <UploadDropzone
           onFilesSelected={(selectedFiles) => {
             setFiles(selectedFiles);
-            console.log("Files selected:", selectedFiles);
           }}
         />
       </div>
 
-      {files.length > 0 && (
+      {files.length > 0 && selectedTemplate && (
         <>
           <Alert>
             <Info className="w-4 h-4" />
@@ -76,10 +193,11 @@ export default function Upload() {
                 <Button
                   size="lg"
                   className="flex-1"
-                  onClick={() => console.log("Start processing")}
+                  onClick={handleStartProcessing}
+                  disabled={createJobMutation.isPending}
                   data-testid="button-start-processing"
                 >
-                  Start Processing
+                  {createJobMutation.isPending ? "Creating Job..." : "Start Processing"}
                 </Button>
                 <Button
                   variant="outline"
@@ -94,7 +212,7 @@ export default function Upload() {
             <div>
               <BatchEditPanel
                 imageCount={files.length}
-                onApply={(settings) => console.log("Apply settings:", settings)}
+                onApply={(settings) => setBatchSettings(settings)}
               />
             </div>
           </div>

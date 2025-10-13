@@ -98,12 +98,12 @@ export default function Admin() {
     });
   };
 
-  const mockTemplates = [
-    { id: "1", name: "Blue Gradient", category: "Minimal", uses: 1247, status: "active" },
-    { id: "2", name: "White Studio", category: "Studio", uses: 892, status: "active" },
-    { id: "3", name: "Wooden Table", category: "Natural", uses: 567, status: "active" },
-    { id: "4", name: "Pink Pastel", category: "Colorful", uses: 234, status: "inactive" },
-  ];
+  // Fetch templates from database
+  const { data: templatesData } = useQuery<{ templates: any[] }>({
+    queryKey: ["/api/templates"],
+  });
+
+  const templates = templatesData?.templates || [];
 
   return (
     <div className="space-y-8" data-testid="page-admin">
@@ -299,30 +299,38 @@ export default function Admin() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mockTemplates.map((template) => (
-                  <TableRow key={template.id} data-testid={`row-template-${template.id}`}>
-                    <TableCell className="font-medium">{template.name}</TableCell>
-                    <TableCell>{template.category}</TableCell>
-                    <TableCell className="font-mono">{template.uses}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={template.status === "active" ? "default" : "secondary"}
-                      >
-                        {template.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex gap-2 justify-end">
-                        <Button variant="ghost" size="sm" data-testid={`button-edit-template-${template.id}`}>
-                          Edit
-                        </Button>
-                        <Button variant="ghost" size="sm" data-testid={`button-delete-template-${template.id}`}>
-                          Delete
-                        </Button>
-                      </div>
+                {templates.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                      No templates found
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  templates.map((template) => (
+                    <TableRow key={template.id} data-testid={`row-template-${template.id}`}>
+                      <TableCell className="font-medium">{template.name}</TableCell>
+                      <TableCell>{template.category}</TableCell>
+                      <TableCell className="font-mono">—</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={template.isActive ? "default" : "secondary"}
+                        >
+                          {template.isActive ? 'active' : 'inactive'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex gap-2 justify-end">
+                          <Button variant="ghost" size="sm" data-testid={`button-edit-template-${template.id}`}>
+                            Edit
+                          </Button>
+                          <Button variant="ghost" size="sm" data-testid={`button-delete-template-${template.id}`}>
+                            Delete
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </Card>

@@ -1,54 +1,24 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import JobCard from "@/components/JobCard";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
+import type { ProcessingJob } from "@shared/schema";
 
 export default function History() {
   const [filter, setFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const mockJobs = [
-    {
-      id: "1",
-      templateName: "Blue Gradient Background",
-      imageCount: 1247,
-      status: "processing" as const,
-      progress: 67,
-      timestamp: "2 hours ago",
-    },
-    {
-      id: "2",
-      templateName: "White Minimal Studio",
-      imageCount: 523,
-      status: "completed" as const,
-      timestamp: "Yesterday",
-    },
-    {
-      id: "3",
-      templateName: "Wooden Table Surface",
-      imageCount: 892,
-      status: "queued" as const,
-      timestamp: "3 hours ago",
-    },
-    {
-      id: "4",
-      templateName: "Pink Pastel Dream",
-      imageCount: 345,
-      status: "completed" as const,
-      timestamp: "2 days ago",
-    },
-    {
-      id: "5",
-      templateName: "Black Premium Dark",
-      imageCount: 678,
-      status: "failed" as const,
-      timestamp: "3 days ago",
-    },
-  ];
+  // Fetch jobs from database
+  const { data: jobsData, isLoading } = useQuery<{ jobs: ProcessingJob[] }>({
+    queryKey: ["/api/jobs"],
+  });
 
-  const filteredJobs = mockJobs.filter((job) => {
-    const matchesSearch = job.templateName
+  const jobs = jobsData?.jobs || [];
+
+  const filteredJobs = jobs.filter((job) => {
+    const matchesSearch = job.id
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
     const matchesFilter = !filter || job.status === filter;
@@ -56,11 +26,25 @@ export default function History() {
   });
 
   const statusCounts = {
-    all: mockJobs.length,
-    processing: mockJobs.filter((j) => j.status === "processing").length,
-    completed: mockJobs.filter((j) => j.status === "completed").length,
-    queued: mockJobs.filter((j) => j.status === "queued").length,
-    failed: mockJobs.filter((j) => j.status === "failed").length,
+    all: jobs.length,
+    processing: jobs.filter((j) => j.status === "processing").length,
+    completed: jobs.filter((j) => j.status === "completed").length,
+    queued: jobs.filter((j) => j.status === "queued").length,
+    failed: jobs.filter((j) => j.status === "failed").length,
+  };
+
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 60) return `${diffMins} minutes ago`;
+    if (diffHours < 24) return `${diffHours} hours ago`;
+    if (diffDays === 1) return 'Yesterday';
+    return `${diffDays} days ago`;
   };
 
   return (
@@ -77,7 +61,7 @@ export default function History() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Search by template name..."
+            placeholder="Search by job ID..."
             className="pl-10"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -129,21 +113,36 @@ export default function History() {
         </Badge>
       </div>
 
-      <div className="space-y-4">
-        {filteredJobs.map((job) => (
-          <JobCard
-            key={job.id}
-            {...job}
-            onView={() => console.log("View job", job.id)}
-            onDownload={() => console.log("Download job", job.id)}
-            onReprocess={() => console.log("Reprocess job", job.id)}
-          />
-        ))}
-      </div>
+      {isLoading ? (
+        <div className="text-center py-12 text-muted-foreground">Loading jobs...</div>
+      ) : (
+        <div className="space-y-4">
+          {filteredJobs.map((job) => (
+            <JobCard
+              key={job.id}
+              id={job.id}
+              templateName={`Job ${job.id.slice(0, 8)}`}
+              imageCount={job.totalImages}
+              status={job.status}
+              progress={job.totalImages > 0 ? Math.round((job.processedImages / job.totalImages) * 100) : 0}
+              timestamp={formatTimestamp(job.createdAt)}
+              onView={() => console.log("View job", job.id)}
+              onDownload={() => {
+                if (job.zipUrl) {
+                  window.open(job.zipUrl, '_blank');
+                }
+              }}
+              onReprocess={() => console.log("Reprocess job", job.id)}
+            />
+          ))}
+        </div>
+      )}
 
-      {filteredJobs.length === 0 && (
+      {!isLoading && filteredJobs.length === 0 && (
         <div className="text-center py-12">
-          <p className="text-muted-foreground">No jobs found</p>
+          <p className="text-muted-foreground">
+            {jobs.length === 0 ? "No processing jobs yet. Start by uploading images!" : "No jobs found"}
+          </p>
         </div>
       )}
     </div>

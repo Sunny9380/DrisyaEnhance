@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import StatsCard from "@/components/StatsCard";
 import JobCard from "@/components/JobCard";
 import ImageComparisonSlider from "@/components/ImageComparisonSlider";
@@ -7,32 +8,53 @@ import { Link } from "wouter";
 import { Separator } from "@/components/ui/separator";
 import earringsWhiteBg from "@assets/WhatsApp Image 2025-10-12 at 14.02.54_bef9f90d_1760283307730.jpg";
 import earringsDarkBg from "@assets/WhatsApp Image 2025-10-12 at 14.03.27_c425ce07_1760283310185.jpg";
+import type { ProcessingJob } from "@shared/schema";
+
+interface User {
+  id: string;
+  email: string;
+  name: string;
+  coinBalance: number;
+  role: string;
+}
 
 export default function Dashboard() {
-  const mockJobs = [
-    {
-      id: "1",
-      templateName: "Blue Gradient Background",
-      imageCount: 1247,
-      status: "processing" as const,
-      progress: 67,
-      timestamp: "2 hours ago",
-    },
-    {
-      id: "2",
-      templateName: "White Minimal Studio",
-      imageCount: 523,
-      status: "completed" as const,
-      timestamp: "Yesterday",
-    },
-    {
-      id: "3",
-      templateName: "Wooden Table Surface",
-      imageCount: 892,
-      status: "queued" as const,
-      timestamp: "3 hours ago",
-    },
-  ];
+  // Fetch current user for coin balance
+  const { data: userData } = useQuery<{ user: User }>({
+    queryKey: ["/api/auth/me"],
+  });
+
+  // Fetch recent jobs
+  const { data: jobsData } = useQuery<{ jobs: ProcessingJob[] }>({
+    queryKey: ["/api/jobs"],
+  });
+
+  const jobs = jobsData?.jobs || [];
+  const recentJobs = jobs.slice(0, 3);
+
+  // Calculate stats from real data
+  const totalProcessed = jobs.reduce((sum, job) => sum + (job.processedImages || 0), 0);
+  const completedToday = jobs.filter(job => {
+    const createdAt = new Date(job.createdAt);
+    const today = new Date();
+    return createdAt.toDateString() === today.toDateString() && job.status === 'completed';
+  }).reduce((sum, job) => sum + (job.processedImages || 0), 0);
+  const inQueue = jobs.filter(j => j.status === 'queued' || j.status === 'processing')
+    .reduce((sum, job) => sum + (job.totalImages - (job.processedImages || 0)), 0);
+
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 60) return `${diffMins} minutes ago`;
+    if (diffHours < 24) return `${diffHours} hours ago`;
+    if (diffDays === 1) return 'Yesterday';
+    return `${diffDays} days ago`;
+  };
 
   return (
     <div className="space-y-12" data-testid="page-dashboard">
@@ -56,26 +78,25 @@ export default function Dashboard() {
         <StatsCard
           icon={Image}
           label="Total Processed"
-          value="12,453"
-          trend="+18% from last month"
+          value={totalProcessed.toString()}
           iconColor="text-primary"
         />
         <StatsCard
           icon={CheckCircle}
           label="Completed Today"
-          value="247"
+          value={completedToday.toString()}
           iconColor="text-chart-2"
         />
         <StatsCard
           icon={Clock}
           label="In Queue"
-          value="1,892"
+          value={inQueue.toString()}
           iconColor="text-chart-4"
         />
         <StatsCard
           icon={Coins}
           label="Coin Balance"
-          value="2,500"
+          value={userData?.user?.coinBalance?.toString() || "0"}
           iconColor="text-chart-4"
         />
       </div>
@@ -91,15 +112,30 @@ export default function Dashboard() {
         </div>
 
         <div className="space-y-4">
-          {mockJobs.map((job) => (
-            <JobCard
-              key={job.id}
-              {...job}
-              onView={() => console.log("View job", job.id)}
-              onDownload={() => console.log("Download job", job.id)}
-              onReprocess={() => console.log("Reprocess job", job.id)}
-            />
-          ))}
+          {recentJobs.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              No processing jobs yet. Start by uploading images!
+            </div>
+          ) : (
+            recentJobs.map((job) => (
+              <JobCard
+                key={job.id}
+                id={job.id}
+                templateName={`Job ${job.id.slice(0, 8)}`}
+                imageCount={job.totalImages}
+                status={job.status}
+                progress={job.totalImages > 0 ? Math.round((job.processedImages / job.totalImages) * 100) : 0}
+                timestamp={formatTimestamp(job.createdAt)}
+                onView={() => console.log("View job", job.id)}
+                onDownload={() => {
+                  if (job.zipUrl) {
+                    window.open(job.zipUrl, '_blank');
+                  }
+                }}
+                onReprocess={() => console.log("Reprocess job", job.id)}
+              />
+            ))
+          )}
         </div>
       </div>
 
