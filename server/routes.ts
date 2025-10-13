@@ -738,6 +738,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get images for a specific job
+  app.get("/api/jobs/:jobId/images", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const job = await storage.getProcessingJob(req.params.jobId);
+      if (!job) {
+        return res.status(404).json({ message: "Job not found" });
+      }
+
+      if (job.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const images = await storage.getJobImages(req.params.jobId);
+      res.json({ images });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Download processed images (zip)
   app.get("/api/jobs/:jobId/download", async (req: Request, res: Response) => {
     if (!req.session.userId) {

@@ -3,19 +3,38 @@ import { useQuery } from "@tanstack/react-query";
 import JobCard from "@/components/JobCard";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Search, Download, X } from "lucide-react";
 import type { ProcessingJob } from "@shared/schema";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+
+interface JobImage {
+  id: string;
+  originalUrl: string;
+  processedUrl: string | null;
+  status: string;
+}
 
 export default function History() {
   const [filter, setFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [viewJobId, setViewJobId] = useState<string | null>(null);
+  const { toast } = useToast();
 
   // Fetch jobs from database
   const { data: jobsData, isLoading } = useQuery<{ jobs: ProcessingJob[] }>({
     queryKey: ["/api/jobs"],
   });
 
+  // Fetch images for the selected job
+  const { data: imagesData } = useQuery<{ images: JobImage[] }>({
+    queryKey: ["/api/jobs", viewJobId, "images"],
+    enabled: !!viewJobId,
+  });
+
   const jobs = jobsData?.jobs || [];
+  const jobImages = imagesData?.images || [];
 
   const filteredJobs = jobs.filter((job) => {
     const matchesSearch = job.id
@@ -45,6 +64,35 @@ export default function History() {
     if (diffHours < 24) return `${diffHours} hours ago`;
     if (diffDays === 1) return 'Yesterday';
     return `${diffDays} days ago`;
+  };
+
+  const handleDownload = async (jobId: string) => {
+    try {
+      const response = await fetch(`/api/jobs/${jobId}/download`);
+      if (!response.ok) throw new Error("Download failed");
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `drisya-job-${jobId}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({ title: "✅ Download started" });
+    } catch (error) {
+      toast({ 
+        title: "❌ Download failed", 
+        description: "Could not download images",
+        variant: "destructive" 
+      });
+    }
+  };
+
+  const handleView = (jobId: string) => {
+    setViewJobId(jobId);
   };
 
   return (
@@ -126,12 +174,8 @@ export default function History() {
               status={job.status}
               progress={job.totalImages > 0 ? Math.round((job.processedImages / job.totalImages) * 100) : 0}
               timestamp={formatTimestamp(job.createdAt)}
-              onView={() => console.log("View job", job.id)}
-              onDownload={() => {
-                if (job.zipUrl) {
-                  window.open(job.zipUrl, '_blank');
-                }
-              }}
+              onView={() => handleView(job.id)}
+              onDownload={() => handleDownload(job.id)}
               onReprocess={() => console.log("Reprocess job", job.id)}
             />
           ))}
@@ -145,6 +189,54 @@ export default function History() {
           </p>
         </div>
       )}
+
+      {/* Image Gallery Dialog */}
+      <Dialog open={!!viewJobId} onOpenChange={(open) => !open && setViewJobId(null)}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <span>Job Images ({jobImages.length})</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => viewJobId && handleDownload(viewJobId)}
+                data-testid="button-download-all"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download All
+              </Button>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+            {jobImages.map((img, idx) => (
+              <div key={img.id} className="space-y-2">
+                <div className="relative aspect-square bg-muted rounded overflow-hidden">
+                  {img.processedUrl ? (
+                    <img
+                      src={img.processedUrl}
+                      alt={`Processed ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                      data-testid={`img-processed-${idx}`}
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-muted-foreground">
+                      Processing...
+                    </div>
+                  )}
+                </div>
+                <div className="text-xs text-muted-foreground text-center">
+                  Image {idx + 1}
+                </div>
+              </div>
+            ))}
+          </div>
+          {jobImages.length === 0 && (
+            <div className="text-center py-12 text-muted-foreground">
+              No images to display
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
