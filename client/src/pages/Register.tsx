@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Link, useLocation } from "wouter";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Info } from "lucide-react";
+import { Info, Gift } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -15,17 +15,31 @@ export default function Register() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [referralCode, setReferralCode] = useState("");
   const { toast } = useToast();
 
+  // Detect referral code from URL query parameter
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const refCode = params.get("ref");
+    if (refCode) {
+      setReferralCode(refCode);
+    }
+  }, []);
+
   const registerMutation = useMutation({
-    mutationFn: async (data: { name: string; email: string; password: string }) => {
+    mutationFn: async (data: { name: string; email: string; password: string; referralCode?: string }) => {
       const res = await apiRequest("POST", "/api/auth/register", data);
       return await res.json();
     },
     onSuccess: () => {
+      const message = referralCode 
+        ? "Welcome to Drisya! You received 100 welcome coins. Your referrer will get bonus coins too!"
+        : "Welcome to Drisya! You received 100 welcome coins.";
+      
       toast({
         title: "Account created!",
-        description: "Welcome to Drisya! You received 100 welcome coins.",
+        description: message,
       });
       setLocation("/dashboard");
     },
@@ -40,7 +54,12 @@ export default function Register() {
 
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
-    registerMutation.mutate({ name, email, password });
+    registerMutation.mutate({ 
+      name, 
+      email, 
+      password, 
+      ...(referralCode && { referralCode }) 
+    });
   };
 
   return (
@@ -68,6 +87,15 @@ export default function Register() {
               Demo: Enter any details to access the dashboard with 100 welcome coins
             </AlertDescription>
           </Alert>
+
+          {referralCode && (
+            <Alert className="mb-6 bg-primary/10 border-primary">
+              <Gift className="w-4 h-4 text-primary" />
+              <AlertDescription className="text-sm">
+                You were referred by a friend! Both of you will get bonus coins! 🎉
+              </AlertDescription>
+            </Alert>
+          )}
 
           <form onSubmit={handleRegister} className="space-y-6">
             <div className="space-y-2">

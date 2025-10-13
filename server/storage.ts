@@ -20,6 +20,8 @@ import {
   type InsertManualTransaction,
   type MediaLibrary,
   type InsertMediaLibrary,
+  type Referral,
+  type InsertReferral,
   users,
   templates,
   processingJobs,
@@ -30,6 +32,7 @@ import {
   coinPackages,
   manualTransactions,
   mediaLibrary,
+  referrals,
 } from "@shared/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 
@@ -111,6 +114,20 @@ export interface IStorage {
   getMediaLibraryEntry(id: string): Promise<MediaLibrary | undefined>;
   toggleMediaFavorite(id: string, isFavorite: boolean): Promise<void>;
   deleteMediaLibraryEntry(id: string): Promise<void>;
+
+  // Referrals - Referral program
+  generateReferralCode(userId: string): Promise<string>;
+  getUserReferralCode(userId: string): Promise<string | null>;
+  getUserByReferralCode(code: string): Promise<User | undefined>;
+  createReferral(referral: InsertReferral): Promise<Referral>;
+  getUserReferrals(userId: string): Promise<Referral[]>;
+  getReferralStats(userId: string): Promise<{
+    totalReferrals: number;
+    completedReferrals: number;
+    pendingReferrals: number;
+    totalCoinsEarned: number;
+  }>;
+  completeReferral(referralCode: string, referredUserId: string): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -542,6 +559,123 @@ export class DbStorage implements IStorage {
 
   async deleteMediaLibraryEntry(id: string): Promise<void> {
     await db.delete(mediaLibrary).where(eq(mediaLibrary.id, id));
+  }
+
+  // Referrals
+  async generateReferralCode(userId: string): Promise<string> {
+    const user = await this.getUser(userId);
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    if (user.referralCode) {
+      return user.referralCode;
+    }
+
+    // Generate unique referral code: DRISYA-{first 2 letters of name}{random 4 chars}
+    const namePrefix = user.name?.substring(0, 2).toUpperCase() || user.email.substring(0, 2).toUpperCase();
+    const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const referralCode = `DRISYA-${namePrefix}${randomSuffix}`;
+
+    // Update user with referral code
+    await db
+      .update(users)
+      .set({ referralCode })
+      .where(eq(users.id, userId));
+
+    return referralCode;
+  }
+
+  async getUserReferralCode(userId: string): Promise<string | null> {
+    const user = await this.getUser(userId);
+    return user?.referralCode || null;
+  }
+
+  async getUserByReferralCode(code: string): Promise<User | undefined> {
+    const result = await db
+      .select()
+      .from(users)
+      .where(eq(users.referralCode, code))
+      .limit(1);
+    return result[0];
+  }
+
+  async createReferral(referral: InsertReferral): Promise<Referral> {
+    const result = await db.insert(referrals).values(referral).returning();
+    return result[0];
+  }
+
+  async getUserReferrals(userId: string): Promise<Referral[]> {
+    return await db
+      .select()
+      .from(referrals)
+      .where(eq(referrals.referrerId, userId))
+      .orderBy(desc(referrals.createdAt));
+  }
+
+  async getReferralStats(userId: string): Promise<{
+    totalReferrals: number;
+    completedReferrals: number;
+    pendingReferrals: number;
+    totalCoinsEarned: number;
+  }> {
+    const userReferrals = await this.getUserReferrals(userId);
+    
+    const totalReferrals = userReferrals.length;
+    const completedReferrals = userReferrals.filter(r => r.status === "completed").length;
+    const pendingReferrals = userReferrals.filter(r => r.status === "pending").length;
+    const totalCoinsEarned = userReferrals.reduce((sum, r) => sum + r.coinsEarned, 0);
+
+    return {
+      totalReferrals,
+      completedReferrals,
+      pendingReferrals,
+      totalCoinsEarned,
+    };
+  }
+
+  async completeReferral(referralCode: string, referredUserId: string): Promise<void> {
+    await db.transaction(async (tx) => {
+      // Find the referral
+      const result = await tx
+        .select()
+        .from(referrals)
+        .where(eq(referrals.referralCode, referralCode))
+        .limit(1);
+      
+      const referral = result[0];
+      if (!referral) {
+        throw new Error("Referral not found");
+      }
+
+      // Update referral status
+      await tx
+        .update(referrals)
+        .set({
+          referredUserId,
+          status: "completed",
+          coinsEarned: 50,
+          completedAt: new Date(),
+        })
+        .where(eq(referrals.id, referral.id));
+
+      // Award coins to referrer
+      await tx
+        .update(users)
+        .set({
+          coinBalance: sql`${users.coinBalance} + 50`,
+        })
+        .where(eq(users.id, referral.referrerId));
+
+      // Create transaction record
+      await tx.insert(transactions).values({
+        userId: referral.referrerId,
+        type: "referral",
+        amount: 50,
+        description: "Referral bonus - Friend signed up",
+        metadata: { referralId: referral.id, referredUserId },
+      });
+    });
   }
 }
 

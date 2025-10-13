@@ -121,7 +121,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register
   app.post("/api/auth/register", async (req: Request, res: Response) => {
     try {
-      const validatedData = insertUserSchema.parse(req.body);
+      const { referralCode, ...userData } = req.body;
+      const validatedData = insertUserSchema.parse(userData);
       
       // Check if user exists
       const existingUser = await storage.getUserByEmail(validatedData.email);
@@ -145,6 +146,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description: "Welcome bonus - 100 free coins",
         metadata: { source: "trial_bonus" },
       });
+
+      // Handle referral code if provided
+      if (referralCode) {
+        try {
+          const referrer = await storage.getUserByReferralCode(referralCode);
+          if (referrer) {
+            // Create referral record
+            await storage.createReferral({
+              referrerId: referrer.id,
+              referralCode: referralCode,
+            });
+
+            // Complete the referral and award coins
+            await storage.completeReferral(referralCode, user.id);
+
+            // Send referral success email to referrer (non-blocking)
+            const updatedReferrer = await storage.getUser(referrer.id);
+            if (updatedReferrer && shouldSendEmail(updatedReferrer, "referral")) {
+              const { sendReferralSuccessEmail } = await import("./email");
+              sendReferralSuccessEmail(updatedReferrer, user).catch((error) => {
+                console.error("Failed to send referral email:", error);
+              });
+            }
+          }
+        } catch (error) {
+          console.error("Failed to process referral:", error);
+        }
+      }
 
       // Set session
       req.session.userId = user.id;
@@ -318,6 +347,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const stats = await storage.getUserStats(req.session.userId);
       res.json({ stats });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ============== Referral Routes ==============
+
+  // Get or generate user's referral code
+  app.get("/api/referrals/my-code", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      let referralCode = await storage.getUserReferralCode(req.session.userId);
+      
+      if (!referralCode) {
+        referralCode = await storage.generateReferralCode(req.session.userId);
+      }
+
+      res.json({ referralCode });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get referral statistics
+  app.get("/api/referrals/stats", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const stats = await storage.getReferralStats(req.session.userId);
+      res.json({ stats });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get user's referral list
+  app.get("/api/referrals/list", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const referrals = await storage.getUserReferrals(req.session.userId);
+      
+      // Enhance with referred user details
+      const referralsWithDetails = await Promise.all(
+        referrals.map(async (referral) => {
+          let referredUserName = "Pending signup";
+          if (referral.referredUserId) {
+            const referredUser = await storage.getUser(referral.referredUserId);
+            referredUserName = referredUser?.name || referredUser?.email || "Unknown";
+          }
+          
+          return {
+            ...referral,
+            referredUserName,
+          };
+        })
+      );
+
+      res.json({ referrals: referralsWithDetails });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

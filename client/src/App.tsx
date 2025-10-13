@@ -25,6 +25,7 @@ import Team from "@/pages/Team";
 import Integrations from "@/pages/Integrations";
 import APIAccess from "@/pages/APIAccess";
 import MediaLibrary from "@/pages/MediaLibrary";
+import Help from "@/pages/Help";
 import NotFound from "@/pages/NotFound";
 import NotificationCenter from "@/components/NotificationCenter";
 import KeyboardShortcuts from "@/components/KeyboardShortcuts";
@@ -65,6 +66,7 @@ function AuthenticatedRouter() {
       <Route path="/profile" component={Profile} />
       <Route path="/analytics" component={Analytics} />
       <Route path="/referrals" component={Referrals} />
+      <Route path="/help" component={Help} />
       <Route path="/team" component={Team} />
       <Route path="/integrations" component={Integrations} />
       <Route path="/api" component={APIAccess} />

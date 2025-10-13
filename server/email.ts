@@ -341,7 +341,45 @@ export async function sendCoinsAddedEmail(
   });
 }
 
-export function shouldSendEmail(user: User, emailType: "welcome" | "jobCompletion" | "paymentConfirmed" | "coinsAdded"): boolean {
+export async function sendReferralSuccessEmail(referrer: User, referredUser: User): Promise<boolean> {
+  const content = `
+    <h2>Great News! You Earned Referral Bonus! 🎉</h2>
+    <p>Hi ${referrer.name || "there"},</p>
+    <p>Your referral was successful! <strong>${referredUser.name || referredUser.email}</strong> just signed up using your referral code.</p>
+    
+    <div class="stats">
+      <div class="stat-item">
+        <span class="stat-label">Referral Bonus Earned</span>
+        <span class="stat-value">50 Coins</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">New Balance</span>
+        <span class="stat-value">${referrer.coinBalance} coins</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Referred User</span>
+        <span class="stat-value">${referredUser.name || referredUser.email}</span>
+      </div>
+    </div>
+
+    <p><strong>50 coins</strong> have been added to your wallet automatically!</p>
+    
+    <p>Keep sharing your referral link to earn more bonus coins!</p>
+
+    <a href="${APP_URL}/referrals" class="button">View Your Referrals</a>
+
+    <p>Thank you for spreading the word about Drisya!</p>
+    <p><strong>The Drisya Team</strong></p>
+  `;
+
+  return sendEmail({
+    to: referrer.email,
+    subject: `You Earned 50 Coins! 🎁 ${referredUser.name || "Someone"} Joined Using Your Link`,
+    html: getEmailLayout(content),
+  });
+}
+
+export function shouldSendEmail(user: User, emailType: "welcome" | "jobCompletion" | "paymentConfirmed" | "coinsAdded" | "referral"): boolean {
   if (!user.emailNotifications) {
     return false;
   }
@@ -355,6 +393,8 @@ export function shouldSendEmail(user: User, emailType: "welcome" | "jobCompletio
       return user.notifyPaymentConfirmed;
     case "coinsAdded":
       return user.notifyCoinsAdded;
+    case "referral":
+      return user.notifyCoinsAdded; // Use same setting as coins added
     default:
       return false;
   }

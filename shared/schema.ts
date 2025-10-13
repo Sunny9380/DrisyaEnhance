@@ -11,6 +11,7 @@ export const users = pgTable("users", {
   name: text("name"),
   phone: text("phone"), // WhatsApp number for admin contact
   avatarUrl: text("avatar_url"), // Profile avatar image URL
+  referralCode: text("referral_code").unique(), // User's unique referral code
   coinBalance: integer("coin_balance").notNull().default(0),
   role: text("role").notNull().default("user"), // user, admin
   emailNotifications: boolean("email_notifications").notNull().default(true), // Allow users to opt-out
