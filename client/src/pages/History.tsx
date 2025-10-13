@@ -181,6 +181,8 @@ export default function History() {
               status={job.status}
               progress={job.totalImages > 0 ? Math.round((job.processedImages / job.totalImages) * 100) : 0}
               timestamp={formatTimestamp(job.createdAt)}
+              createdAt={job.createdAt}
+              completedAt={job.completedAt}
               onView={() => handleView(job.id)}
               onDownload={() => handleDownload(job.id)}
               onReprocess={() => console.log("Reprocess job", job.id)}

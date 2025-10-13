@@ -11,6 +11,8 @@ interface JobCardProps {
   status: "queued" | "processing" | "completed" | "failed";
   progress?: number;
   timestamp: string;
+  createdAt?: string;
+  completedAt?: string;
   onView?: () => void;
   onDownload?: () => void;
   onReprocess?: () => void;
@@ -23,10 +25,39 @@ export default function JobCard({
   status,
   progress = 0,
   timestamp,
+  createdAt,
+  completedAt,
   onView,
   onDownload,
   onReprocess,
 }: JobCardProps) {
+  
+  // Calculate processing time for completed jobs
+  const getProcessingTime = () => {
+    if (status !== "completed" || !createdAt || !completedAt) return null;
+    
+    const start = new Date(createdAt).getTime();
+    const end = new Date(completedAt).getTime();
+    const diffSeconds = Math.round((end - start) / 1000);
+    
+    if (diffSeconds < 60) {
+      return `${diffSeconds}s total`;
+    }
+    const mins = Math.floor(diffSeconds / 60);
+    const secs = diffSeconds % 60;
+    return `${mins}m ${secs}s total`;
+  };
+  
+  const getTimePerImage = () => {
+    if (status !== "completed" || !createdAt || !completedAt || imageCount === 0) return null;
+    
+    const start = new Date(createdAt).getTime();
+    const end = new Date(completedAt).getTime();
+    const diffSeconds = (end - start) / 1000;
+    const perImage = Math.round(diffSeconds / imageCount * 10) / 10; // Round to 1 decimal
+    
+    return `${perImage}s per image`;
+  };
   const getStatusColor = () => {
     switch (status) {
       case "queued":
@@ -76,6 +107,11 @@ export default function JobCard({
               {" • "}
               {timestamp}
             </p>
+            {status === "completed" && getProcessingTime() && (
+              <p className="text-xs text-primary font-semibold mt-1">
+                ⚡ {getProcessingTime()} • {getTimePerImage()}
+              </p>
+            )}
           </div>
         </div>
 
