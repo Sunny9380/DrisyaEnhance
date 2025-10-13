@@ -766,6 +766,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               );
             }
 
+            // Re-fetch images to get updated processedUrl values
+            const updatedJobImages = await storage.getJobImages(job.id);
+            
             // Create zip file with processed images
             const zipFileName = `job-${job.id}.zip`;
             const zipPath = path.join("uploads", "processed", zipFileName);
@@ -776,7 +779,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             archive.pipe(output);
 
             // Add all processed images to zip
-            for (const image of jobImages) {
+            for (const image of updatedJobImages) {
               if (image.processedUrl) {
                 const imagePath = path.join("uploads", "processed", path.basename(image.processedUrl));
                 try {
@@ -790,7 +793,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await archive.finalize();
 
             // Update job status
-            const completedCount = jobImages.filter(img => img.processedUrl).length;
+            const completedCount = updatedJobImages.filter(img => img.processedUrl).length;
             await storage.updateProcessingJobStatus(
               job.id,
               completedCount === jobImages.length ? "completed" : "failed",
