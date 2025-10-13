@@ -14,17 +14,17 @@ const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || "http://localhost:5
 // Helper function to process image with Python AI service
 async function processImageWithAI(
   imagePath: string,
-  backgroundPrompt: string
+  templateSettings: any
 ): Promise<string> {
   try {
     // Read image file
     const imageBuffer = await fs.readFile(imagePath);
     const imageBase64 = imageBuffer.toString("base64");
 
-    // Call Python service
+    // Call Python service with advanced template settings
     const response = await axios.post(`${PYTHON_SERVICE_URL}/process`, {
       image: imageBase64,
-      background_prompt: backgroundPrompt,
+      template_settings: templateSettings,
       remove_background: true,
     }, {
       timeout: 30000, // 30 second timeout
@@ -328,9 +328,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Get all images for this job
             const jobImages = await storage.getJobImages(job.id);
             
-            // Get background prompt from batch settings
-            const backgroundPrompt = job.batchSettings?.backgroundPrompt || 
-              "elegant dark gradient background for product photography";
+            // Fetch template settings from database
+            const template = await storage.getTemplate(job.templateId);
+            if (!template) {
+              throw new Error("Template not found");
+            }
+            
+            // Prepare template settings for Python AI service
+            const templateSettings = {
+              backgroundStyle: template.backgroundStyle || 'gradient',
+              lightingPreset: template.lightingPreset || 'soft-glow',
+              shadowIntensity: template.settings?.shadowIntensity || 0,
+              vignetteStrength: template.settings?.vignetteStrength || 0,
+              colorGrading: template.settings?.colorGrading || 'neutral',
+              gradientColors: template.settings?.gradientColors || ['#0F2027', '#203A43'],
+              diffusionPrompt: template.settings?.diffusionPrompt || '',
+            };
             
             // Ensure processed directory exists
             await fs.mkdir(path.join("uploads", "processed"), { recursive: true });
@@ -340,8 +353,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               try {
                 const originalPath = path.join("uploads", path.basename(image.originalUrl));
                 
-                // Process with Python AI service
-                const processedBase64 = await processImageWithAI(originalPath, backgroundPrompt);
+                // Process with Python AI service using template settings
+                const processedBase64 = await processImageWithAI(originalPath, templateSettings);
                 
                 // Save processed image
                 const processedFileName = `processed-${path.basename(image.originalUrl)}.png`;
