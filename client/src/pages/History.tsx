@@ -22,9 +22,16 @@ export default function History() {
   const [viewJobId, setViewJobId] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Fetch jobs from database
+  // Fetch jobs from database with auto-refresh for processing jobs
   const { data: jobsData, isLoading } = useQuery<{ jobs: ProcessingJob[] }>({
     queryKey: ["/api/jobs"],
+    refetchInterval: (data) => {
+      // Auto-refresh every 2 seconds if there are processing or queued jobs
+      const hasActiveJobs = data?.jobs?.some(
+        (job) => job.status === "processing" || job.status === "queued"
+      );
+      return hasActiveJobs ? 2000 : false;
+    },
   });
 
   // Fetch images for the selected job

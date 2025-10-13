@@ -83,13 +83,23 @@ export default function JobCard({
           <div className="mb-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-muted-foreground">
-                Processing...
+                Processing... {Math.round(progress)}% complete
               </span>
-              <span className="text-sm font-mono font-semibold">
-                {Math.round(progress)}%
+              <span className="text-sm font-mono font-semibold text-primary">
+                {(() => {
+                  // Estimate time: ~6 seconds per image with 20 parallel processing
+                  const remainingImages = imageCount - (imageCount * progress / 100);
+                  const estimatedSeconds = Math.ceil(remainingImages / 20) * 6;
+                  if (estimatedSeconds < 60) return `${estimatedSeconds}s left`;
+                  const mins = Math.ceil(estimatedSeconds / 60);
+                  return `~${mins} min left`;
+                })()}
               </span>
             </div>
             <Progress value={progress} className="h-2" />
+            <p className="text-xs text-muted-foreground mt-1">
+              Processing 20 images in parallel for fastest speed
+            </p>
           </div>
         )}
 
