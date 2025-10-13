@@ -4,12 +4,15 @@ Removes backgrounds and applies custom backgrounds to product images
 """
 
 from flask import Flask, request, jsonify, send_file
-from PIL import Image, ImageDraw, ImageFilter, ImageEnhance
+from PIL import Image, ImageDraw, ImageFilter, ImageEnhance, ImageOps
 import io
 import base64
 import os
-from typing import Tuple
+from typing import Tuple, Dict, Any
 import json
+import numpy as np
+from PIL.ImageColor import getrgb
+import random
 
 app = Flask(__name__)
 
@@ -98,6 +101,222 @@ def create_textured_background(width: int, height: int, description: str) -> Ima
     return bg
 
 
+def create_velvet_texture(width: int, height: int, base_color: str) -> Image.Image:
+    """Create velvet-like texture using noise and gradients"""
+    img = Image.new('RGB', (width, height))
+    pixels = img.load()
+    
+    # Parse base color
+    r, g, b = getrgb(base_color)
+    
+    # Add noise for velvet texture
+    for i in range(width):
+        for j in range(height):
+            noise = random.randint(-15, 15)
+            pixels[i, j] = (
+                max(0, min(255, r + noise)),
+                max(0, min(255, g + noise)),
+                max(0, min(255, b + noise))
+            )
+    
+    # Apply blur for softness
+    img = img.filter(ImageFilter.GaussianBlur(radius=3))
+    return img
+
+
+def create_marble_texture(width: int, height: int, base_color: str, vein_color: str = "#ffffff") -> Image.Image:
+    """Create marble-like texture with veins"""
+    img = Image.new('RGB', (width, height), base_color)
+    draw = ImageDraw.Draw(img)
+    
+    # Add marble veins
+    for _ in range(8):
+        x_start = random.randint(0, width)
+        y_start = random.randint(0, height)
+        
+        points = [(x_start, y_start)]
+        for step in range(30):
+            x_delta = random.randint(-50, 50)
+            y_delta = random.randint(-50, 50)
+            x_new = points[-1][0] + x_delta
+            y_new = points[-1][1] + y_delta
+            points.append((x_new, y_new))
+        
+        draw.line(points, fill=vein_color, width=random.randint(2, 5))
+    
+    # Blur for natural look
+    img = img.filter(ImageFilter.GaussianBlur(radius=8))
+    return img
+
+
+def apply_lighting(image: Image.Image, preset: str, intensity: float = 1.0) -> Image.Image:
+    """Apply lighting effects based on preset"""
+    if preset == "moody":
+        # Darken overall, add directional light
+        enhancer = ImageEnhance.Brightness(image)
+        image = enhancer.enhance(0.7 * intensity)
+        
+        # Add vignette
+        image = apply_vignette(image, strength=0.4)
+        
+    elif preset == "soft-glow":
+        # Soft, even lighting
+        enhancer = ImageEnhance.Brightness(image)
+        image = enhancer.enhance(1.1 * intensity)
+        
+        # Slight blur for glow
+        image = image.filter(ImageFilter.GaussianBlur(radius=1))
+        
+    elif preset == "spotlight":
+        # Dramatic spotlight from top
+        image = apply_vignette(image, strength=0.6, center_x=0.5, center_y=0.3)
+        
+    elif preset == "studio":
+        # Even, professional lighting
+        enhancer = ImageEnhance.Brightness(image)
+        image = enhancer.enhance(1.05 * intensity)
+        
+        enhancer = ImageEnhance.Contrast(image)
+        image = enhancer.enhance(1.1)
+    
+    return image
+
+
+def apply_vignette(image: Image.Image, strength: float = 0.3, center_x: float = 0.5, center_y: float = 0.5) -> Image.Image:
+    """Apply vignette effect"""
+    width, height = image.size
+    
+    # Create radial gradient mask
+    mask = Image.new('L', (width, height), 0)
+    draw = ImageDraw.Draw(mask)
+    
+    center = (int(width * center_x), int(height * center_y))
+    max_dist = ((width/2)**2 + (height/2)**2)**0.5
+    
+    for x in range(width):
+        for y in range(height):
+            dist = ((x - center[0])**2 + (y - center[1])**2)**0.5
+            brightness = int(255 * (1 - (dist / max_dist) * strength))
+            mask.putpixel((x, y), max(0, min(255, brightness)))
+    
+    # Apply mask
+    if image.mode != 'RGB':
+        image = image.convert('RGB')
+    
+    result = Image.composite(Image.new('RGB', image.size, 'black'), image, mask)
+    return result
+
+
+def apply_window_shadows(image: Image.Image, intensity: float = 0.5) -> Image.Image:
+    """Apply window-pane shadow effect"""
+    width, height = image.size
+    overlay = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    
+    # Create vertical shadow bars (window panes)
+    num_bars = 4
+    bar_width = width // (num_bars * 3)
+    
+    for i in range(num_bars):
+        x_pos = i * (width // num_bars) + width // (num_bars * 2)
+        
+        # Draw shadow bar
+        shadow_alpha = int(intensity * 180)
+        draw.rectangle(
+            [(x_pos, 0), (x_pos + bar_width, height)],
+            fill=(0, 0, 0, shadow_alpha)
+        )
+    
+    # Blur shadows for softness
+    overlay = overlay.filter(ImageFilter.GaussianBlur(radius=15))
+    
+    # Composite with original
+    if image.mode != 'RGBA':
+        image = image.convert('RGBA')
+    
+    result = Image.alpha_composite(image, overlay)
+    return result
+
+
+def apply_color_grading(image: Image.Image, style: str) -> Image.Image:
+    """Apply color grading based on style"""
+    if style == "warm":
+        # Enhance reds and yellows
+        r, g, b = image.split()
+        r = ImageEnhance.Brightness(r).enhance(1.1)
+        g = ImageEnhance.Brightness(g).enhance(1.05)
+        image = Image.merge('RGB', (r, g, b))
+        
+    elif style == "cool":
+        # Enhance blues
+        r, g, b = image.split()
+        b = ImageEnhance.Brightness(b).enhance(1.15)
+        image = Image.merge('RGB', (r, g, b))
+        
+    elif style == "dramatic" or style == "luxury":
+        # High contrast, rich colors
+        enhancer = ImageEnhance.Contrast(image)
+        image = enhancer.enhance(1.2)
+        
+        enhancer = ImageEnhance.Color(image)
+        image = enhancer.enhance(1.1)
+    
+    return image
+
+
+def generate_advanced_background(width: int, height: int, settings: Dict[str, Any]) -> Image.Image:
+    """Generate advanced background based on template settings"""
+    bg_style = settings.get('backgroundStyle', 'gradient')
+    
+    if bg_style == 'velvet':
+        # Create velvet texture
+        colors = settings.get('gradientColors', ['#1a1a2e', '#0f3460'])
+        base_color = colors[0] if colors else '#1a1a2e'
+        bg = create_velvet_texture(width, height, base_color)
+        
+    elif bg_style == 'marble':
+        colors = settings.get('gradientColors', ['#f8f9fa', '#ffffff'])
+        base_color = colors[0] if colors else '#f8f9fa'
+        vein_color = '#d0d0d0' if 'white' in str(base_color).lower() else '#808080'
+        bg = create_marble_texture(width, height, base_color, vein_color)
+        
+    elif bg_style == 'minimal':
+        # Simple solid or subtle gradient
+        color = settings.get('gradientColors', ['#ffffff'])[0]
+        bg = Image.new('RGB', (width, height), color)
+        
+    elif bg_style == 'gradient':
+        colors = settings.get('gradientColors', ['#0F2027', '#203A43', '#2C5364'])
+        if len(colors) >= 2:
+            bg = create_gradient_background(width, height, colors[0], colors[1])
+        else:
+            bg = Image.new('RGB', (width, height), colors[0])
+            
+    elif bg_style == 'festive':
+        # Festive background with effects
+        colors = settings.get('gradientColors', ['#d4af37', '#ffd700'])
+        bg = create_gradient_background(width, height, colors[0], colors[1])
+        
+        # Add sparkle/bokeh effect (simplified)
+        overlay = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(overlay)
+        for _ in range(50):
+            x = random.randint(0, width)
+            y = random.randint(0, height)
+            size = random.randint(3, 8)
+            alpha = random.randint(100, 200)
+            draw.ellipse([(x, y), (x+size, y+size)], fill=(255, 255, 255, alpha))
+        
+        bg = bg.convert('RGBA')
+        bg = Image.alpha_composite(bg, overlay.filter(ImageFilter.GaussianBlur(radius=2)))
+        bg = bg.convert('RGB')
+    else:
+        # Default gradient
+        bg = create_gradient_background(width, height, '#1a1a2e', '#0f3460')
+    
+    return bg
+
+
 def composite_image(product: Image.Image, background: Image.Image, size: Tuple[int, int] = (1080, 1080)) -> Image.Image:
     """
     Composite product image onto background
@@ -131,12 +350,20 @@ def health():
 @app.route('/process', methods=['POST'])
 def process_image():
     """
-    Process image: remove background and apply custom background
+    Process image with advanced template settings
     
     Expected JSON:
     {
         "image": "base64_encoded_image",
-        "background_prompt": "description of desired background",
+        "template_settings": {
+            "backgroundStyle": "velvet/marble/minimal/gradient/festive",
+            "lightingPreset": "moody/soft-glow/spotlight/studio",
+            "shadowIntensity": 0.0-1.0,
+            "vignetteStrength": 0.0-1.0,
+            "colorGrading": "warm/cool/dramatic/luxury/neutral",
+            "gradientColors": ["#color1", "#color2"],
+            "diffusionPrompt": "text description"
+        },
         "remove_background": true/false
     }
     """
@@ -151,16 +378,42 @@ def process_image():
         if data.get('remove_background', True):
             image = remove_background_simple(image)
         
-        # Create background from prompt
-        bg_prompt = data.get('background_prompt', 'elegant dark blue gradient')
-        background = create_textured_background(1080, 1080, bg_prompt)
+        # Get template settings
+        settings = data.get('template_settings', {})
+        
+        # Generate advanced background
+        background = generate_advanced_background(1080, 1080, settings)
         
         # Composite images
         result = composite_image(image, background)
         
+        # Apply lighting preset
+        lighting_preset = settings.get('lightingPreset', 'soft-glow')
+        result = apply_lighting(result, lighting_preset)
+        
+        # Apply window shadows if specified
+        shadow_intensity = settings.get('shadowIntensity', 0)
+        if shadow_intensity > 0:
+            result = result.convert('RGBA')
+            result = apply_window_shadows(result, shadow_intensity)
+            result = result.convert('RGB')
+        
+        # Apply vignette if specified
+        vignette_strength = settings.get('vignetteStrength', 0)
+        if vignette_strength > 0:
+            result = apply_vignette(result, vignette_strength)
+        
+        # Apply color grading
+        color_grading = settings.get('colorGrading', 'neutral')
+        if color_grading != 'neutral':
+            result = apply_color_grading(result, color_grading)
+        
+        # Ensure 1080x1080 output
+        result = result.resize((1080, 1080), Image.Resampling.LANCZOS)
+        
         # Convert to base64
         buffer = io.BytesIO()
-        result.save(buffer, format='PNG')
+        result.save(buffer, format='PNG', quality=95)
         buffer.seek(0)
         result_base64 = base64.b64encode(buffer.getvalue()).decode()
         

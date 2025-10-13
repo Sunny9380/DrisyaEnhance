@@ -19,9 +19,13 @@ export const users = pgTable("users", {
 export const templates = pgTable("templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
-  category: text("category").notNull(),
+  category: text("category").notNull(), // jewelry, fashion, etc.
+  backgroundStyle: text("background_style").default("gradient"), // velvet, marble, minimal, gradient, festive
+  lightingPreset: text("lighting_preset").default("soft-glow"), // moody, soft-glow, spotlight, studio
+  description: text("description"),
   thumbnailUrl: text("thumbnail_url"),
-  settings: jsonb("settings"), // JSON settings for the template
+  settings: jsonb("settings"), // Advanced settings: { diffusionPrompt, shadowIntensity, vignetteStrength, etc. }
+  isPremium: boolean("is_premium").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
