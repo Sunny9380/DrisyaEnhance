@@ -12,6 +12,10 @@ export const users = pgTable("users", {
   phone: text("phone"), // WhatsApp number for admin contact
   coinBalance: integer("coin_balance").notNull().default(0),
   role: text("role").notNull().default("user"), // user, admin
+  emailNotifications: boolean("email_notifications").notNull().default(true), // Allow users to opt-out
+  notifyJobCompletion: boolean("notify_job_completion").notNull().default(true),
+  notifyPaymentConfirmed: boolean("notify_payment_confirmed").notNull().default(true),
+  notifyCoinsAdded: boolean("notify_coins_added").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -161,6 +165,10 @@ export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   coinBalance: true,
   role: true,
+  emailNotifications: true,
+  notifyJobCompletion: true,
+  notifyPaymentConfirmed: true,
+  notifyCoinsAdded: true,
   createdAt: true,
 });
 

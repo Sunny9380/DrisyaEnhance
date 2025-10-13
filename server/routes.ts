@@ -10,6 +10,7 @@ import archiver from "archiver";
 import axios from "axios";
 import AdmZip from "adm-zip";
 import { insertUserSchema, insertProcessingJobSchema, insertCoinPackageSchema, insertManualTransactionSchema, insertMediaLibrarySchema } from "@shared/schema";
+import { sendWelcomeEmail, sendJobCompletedEmail, sendPaymentConfirmedEmail, sendCoinsAddedEmail, shouldSendEmail } from "./email";
 
 const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || "http://localhost:5001";
 
@@ -147,6 +148,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Set session
       req.session.userId = user.id;
 
+      // Send welcome email (non-blocking)
+      const updatedUser = await storage.getUser(user.id);
+      if (updatedUser && shouldSendEmail(updatedUser, "welcome")) {
+        sendWelcomeEmail(updatedUser).catch((error) => {
+          console.error("Failed to send welcome email:", error);
+        });
+      }
+
       res.json({
         user: { id: user.id, email: user.email, name: user.name, coinBalance: 100, role: user.role },
       });
@@ -266,6 +275,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const updatedUser = await storage.getUser(targetUserId);
+      
+      // Send coins added email (non-blocking)
+      if (updatedUser && shouldSendEmail(updatedUser, "coinsAdded")) {
+        sendCoinsAddedEmail(
+          updatedUser,
+          amount,
+          description || `${amount} coins have been added to your wallet by an admin.`
+        ).catch((error) => {
+          console.error("Failed to send coins added email:", error);
+        });
+      }
+      
       res.json({ user: updatedUser });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -430,7 +451,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { adminNotes } = req.body;
+      
+      // Get transaction details before approval
+      const transaction = await storage.getManualTransaction(req.params.id);
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+
       await storage.approveManualTransaction(req.params.id, req.session.userId, adminNotes);
+      
+      // Send payment confirmed email (non-blocking)
+      const user = await storage.getUser(transaction.userId);
+      if (user && shouldSendEmail(user, "paymentConfirmed")) {
+        sendPaymentConfirmedEmail(
+          user,
+          transaction.coinAmount,
+          transaction.priceInINR,
+          transaction.paymentMethod
+        ).catch((error) => {
+          console.error("Failed to send payment confirmed email:", error);
+        });
+      }
+      
       res.json({ success: true });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -795,12 +837,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             // Update job status
             const completedCount = updatedJobImages.filter(img => img.processedUrl).length;
+            const jobStatus = completedCount === jobImages.length ? "completed" : "failed";
             await storage.updateProcessingJobStatus(
               job.id,
-              completedCount === jobImages.length ? "completed" : "failed",
+              jobStatus,
               completedCount,
               `/uploads/processed/${zipFileName}`
             );
+
+            // Send job completed email if successful (non-blocking)
+            if (jobStatus === "completed") {
+              const user = await storage.getUser(job.userId);
+              const completedJob = await storage.getProcessingJob(job.id);
+              if (user && completedJob && shouldSendEmail(user, "jobCompletion")) {
+                const downloadUrl = `${process.env.APP_URL || 'http://localhost:5000'}/api/jobs/${job.id}/download`;
+                sendJobCompletedEmail(user, completedJob, downloadUrl).catch((error) => {
+                  console.error("Failed to send job completed email:", error);
+                });
+              }
+            }
 
             // Clean up temporary uploaded files
             for (const image of jobImages) {
