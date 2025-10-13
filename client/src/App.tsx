@@ -21,6 +21,7 @@ import Referrals from "@/pages/Referrals";
 import Team from "@/pages/Team";
 import Integrations from "@/pages/Integrations";
 import APIAccess from "@/pages/APIAccess";
+import MediaLibrary from "@/pages/MediaLibrary";
 import NotFound from "@/pages/NotFound";
 import NotificationCenter from "@/components/NotificationCenter";
 import KeyboardShortcuts from "@/components/KeyboardShortcuts";
@@ -53,6 +54,7 @@ function AuthenticatedRouter() {
       <Route path="/templates" component={Templates} />
       <Route path="/upload" component={Upload} />
       <Route path="/history" component={History} />
+      <Route path="/media-library" component={MediaLibrary} />
       <Route path="/wallet" component={Wallet} />
       <Route path="/analytics" component={Analytics} />
       <Route path="/referrals" component={Referrals} />

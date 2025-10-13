@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import UploadDropzone from "@/components/UploadDropzone";
@@ -9,12 +9,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { Info, Coins, Sparkles } from "lucide-react";
+import { Info, Coins, Sparkles, FileArchive } from "lucide-react";
 import type { Template } from "@shared/schema";
 
 export default function Upload() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const zipInputRef = useRef<HTMLInputElement>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>();
   const [files, setFiles] = useState<File[]>([]);
   const [batchSettings, setBatchSettings] = useState({
@@ -42,6 +43,51 @@ export default function Upload() {
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
 
   const estimatedCoins = files.length * 2;
+
+  // ZIP upload and extraction mutation
+  const uploadZipMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("zip", file);
+      
+      const res = await fetch("/api/upload/zip", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || res.statusText);
+      }
+      
+      return await res.json();
+    },
+    onSuccess: async (data: { images: Array<{ name: string; url: string }> }) => {
+      toast({
+        title: "✅ ZIP extracted!",
+        description: `Found ${data.images.length} images`,
+      });
+      
+      // Convert image URLs to File objects
+      const imageFiles = await Promise.all(
+        data.images.map(async (img) => {
+          const response = await fetch(img.url);
+          const blob = await response.blob();
+          return new File([blob], img.name, { type: blob.type });
+        })
+      );
+      
+      setFiles((prev) => [...prev, ...imageFiles]);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "❌ Failed to extract ZIP",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   // Create processing job mutation
   const createJobMutation = useMutation({
@@ -78,6 +124,22 @@ export default function Upload() {
       });
     },
   });
+
+  const handleZipUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && file.name.endsWith('.zip')) {
+      uploadZipMutation.mutate(file);
+    } else {
+      toast({
+        title: "Invalid file",
+        description: "Please select a ZIP file",
+        variant: "destructive",
+      });
+    }
+    if (zipInputRef.current) {
+      zipInputRef.current.value = '';
+    }
+  };
 
   const handleStartProcessing = async () => {
     if (!selectedTemplateId) {
@@ -170,12 +232,37 @@ export default function Upload() {
       )}
 
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold">Upload Images</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Upload Images</h2>
+          <div className="flex gap-2">
+            <input
+              ref={zipInputRef}
+              type="file"
+              accept=".zip"
+              className="hidden"
+              onChange={handleZipUpload}
+            />
+            <Button
+              variant="outline"
+              onClick={() => zipInputRef.current?.click()}
+              disabled={uploadZipMutation.isPending}
+              data-testid="button-upload-zip"
+            >
+              <FileArchive className="w-4 h-4 mr-2" />
+              {uploadZipMutation.isPending ? "Extracting..." : "Upload ZIP"}
+            </Button>
+          </div>
+        </div>
         <UploadDropzone
           onFilesSelected={(selectedFiles) => {
             setFiles(selectedFiles);
           }}
         />
+        {files.length > 0 && (
+          <Badge variant="secondary" className="mt-2">
+            {files.length} image{files.length !== 1 ? 's' : ''} selected
+          </Badge>
+        )}
       </div>
 
       {files.length > 0 && selectedTemplate && (

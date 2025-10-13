@@ -7,7 +7,8 @@ import path from "path";
 import fs from "fs/promises";
 import archiver from "archiver";
 import axios from "axios";
-import { insertUserSchema, insertProcessingJobSchema, insertCoinPackageSchema, insertManualTransactionSchema } from "@shared/schema";
+import AdmZip from "adm-zip";
+import { insertUserSchema, insertProcessingJobSchema, insertCoinPackageSchema, insertManualTransactionSchema, insertMediaLibrarySchema } from "@shared/schema";
 
 const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || "http://localhost:5001";
 
@@ -716,30 +717,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Ensure processed directory exists
             await fs.mkdir(path.join("uploads", "processed"), { recursive: true });
 
-            // Process each image with AI
-            for (const image of jobImages) {
-              try {
-                const originalPath = path.join("uploads", path.basename(image.originalUrl));
-                
-                // Process with Python AI service using template settings
-                const processedBase64 = await processImageWithAI(originalPath, templateSettings);
-                
-                // Save processed image
-                const processedFileName = `processed-${path.basename(image.originalUrl)}.png`;
-                const processedPath = path.join("uploads", "processed", processedFileName);
-                const processedBuffer = Buffer.from(processedBase64, "base64");
-                await fs.writeFile(processedPath, processedBuffer);
-                
-                // Update image status
-                await storage.updateImageStatus(
-                  image.id,
-                  "completed",
-                  `/uploads/processed/${processedFileName}`
-                );
-              } catch (error) {
-                console.error(`Failed to process image ${image.id}:`, error);
-                await storage.updateImageStatus(image.id, "failed", null);
-              }
+            // Process images in parallel batches for faster speed
+            const batchSize = 3; // Process 3 images at a time
+            for (let i = 0; i < jobImages.length; i += batchSize) {
+              const batch = jobImages.slice(i, i + batchSize);
+              
+              await Promise.all(
+                batch.map(async (image) => {
+                  try {
+                    const originalPath = path.join("uploads", path.basename(image.originalUrl));
+                    
+                    // Process with Python AI service using template settings
+                    const processedBase64 = await processImageWithAI(originalPath, templateSettings);
+                    
+                    // Save processed image
+                    const processedFileName = `processed-${path.basename(image.originalUrl)}.png`;
+                    const processedPath = path.join("uploads", "processed", processedFileName);
+                    const processedBuffer = Buffer.from(processedBase64, "base64");
+                    await fs.writeFile(processedPath, processedBuffer);
+                    
+                    const processedUrl = `/uploads/processed/${processedFileName}`;
+                    
+                    // Update image status
+                    await storage.updateImageStatus(
+                      image.id,
+                      "completed",
+                      processedUrl
+                    );
+                    
+                    // Save to media library
+                    await storage.createMediaLibraryEntry({
+                      userId: job.userId,
+                      jobId: job.id,
+                      imageId: image.id,
+                      fileName: path.basename(image.originalUrl),
+                      processedUrl,
+                      fileSize: processedBuffer.length,
+                      dimensions: "1080x1080",
+                      templateUsed: template.name,
+                      tags: [],
+                      isFavorite: false,
+                    });
+                  } catch (error) {
+                    console.error(`Failed to process image ${image.id}:`, error);
+                    await storage.updateImageStatus(image.id, "failed", null);
+                  }
+                })
+              );
             }
 
             // Create zip file with processed images
@@ -937,6 +961,128 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Purchase failed" });
+    }
+  });
+
+  // ============== ZIP Upload & Extraction Routes ==============
+
+  // Upload ZIP file and extract images
+  app.post(
+    "/api/upload/zip",
+    upload.single("zip"),
+    async (req: Request, res: Response) => {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      try {
+        if (!req.file) {
+          return res.status(400).json({ message: "No ZIP file provided" });
+        }
+
+        const zipPath = req.file.path;
+        const extractDir = path.join("uploads", "extracted", `${Date.now()}`);
+        
+        // Create extraction directory
+        await fs.mkdir(extractDir, { recursive: true });
+
+        // Extract ZIP file
+        const zip = new AdmZip(zipPath);
+        zip.extractAllTo(extractDir, true);
+
+        // Get all image files from extracted directory
+        const allFiles = await fs.readdir(extractDir);
+        const imageExtensions = ['.jpg', '.jpeg', '.png', '.webp'];
+        const imageFiles = allFiles.filter(file => {
+          const ext = path.extname(file).toLowerCase();
+          return imageExtensions.includes(ext);
+        });
+
+        // Move images to uploads directory with unique names
+        const images = [];
+        for (const file of imageFiles) {
+          const sourcePath = path.join(extractDir, file);
+          const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}-${file}`;
+          const destPath = path.join("uploads", uniqueName);
+          await fs.copyFile(sourcePath, destPath);
+          
+          images.push({
+            name: file,
+            path: `/uploads/${uniqueName}`,
+            url: `/uploads/${uniqueName}`,
+          });
+        }
+
+        // Clean up ZIP and extraction directory
+        await fs.unlink(zipPath);
+        await fs.rm(extractDir, { recursive: true, force: true });
+
+        res.json({ 
+          success: true,
+          images,
+          count: images.length 
+        });
+      } catch (error: any) {
+        console.error("ZIP extraction error:", error);
+        res.status(500).json({ message: error.message || "Failed to extract ZIP" });
+      }
+    }
+  );
+
+  // ============== Media Library Routes ==============
+
+  // Get user's media library
+  app.get("/api/media-library", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const media = await storage.getUserMediaLibrary(req.session.userId);
+      res.json({ media });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to fetch media library" });
+    }
+  });
+
+  // Toggle favorite status
+  app.post("/api/media-library/favorite/:id", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { isFavorite } = req.body;
+      const media = await storage.getMediaLibraryEntry(req.params.id);
+      
+      if (!media || media.userId !== req.session.userId) {
+        return res.status(404).json({ message: "Media not found" });
+      }
+
+      await storage.toggleMediaFavorite(req.params.id, isFavorite);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to update favorite" });
+    }
+  });
+
+  // Delete media library entry
+  app.delete("/api/media-library/:id", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const media = await storage.getMediaLibraryEntry(req.params.id);
+      
+      if (!media || media.userId !== req.session.userId) {
+        return res.status(404).json({ message: "Media not found" });
+      }
+
+      await storage.deleteMediaLibraryEntry(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to delete media" });
     }
   });
 

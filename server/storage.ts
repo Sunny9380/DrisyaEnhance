@@ -18,6 +18,8 @@ import {
   type InsertCoinPackage,
   type ManualTransaction,
   type InsertManualTransaction,
+  type MediaLibrary,
+  type InsertMediaLibrary,
   users,
   templates,
   processingJobs,
@@ -27,6 +29,7 @@ import {
   auditLogs,
   coinPackages,
   manualTransactions,
+  mediaLibrary,
 } from "@shared/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 
@@ -93,6 +96,13 @@ export interface IStorage {
   createManualTransaction(txn: InsertManualTransaction): Promise<ManualTransaction>;
   approveManualTransaction(id: string, adminId: string, adminNotes?: string): Promise<void>;
   rejectManualTransaction(id: string, adminId: string, adminNotes: string): Promise<void>;
+
+  // Media Library - Save all processed images
+  createMediaLibraryEntry(entry: InsertMediaLibrary): Promise<MediaLibrary>;
+  getUserMediaLibrary(userId: string): Promise<MediaLibrary[]>;
+  getMediaLibraryEntry(id: string): Promise<MediaLibrary | undefined>;
+  toggleMediaFavorite(id: string, isFavorite: boolean): Promise<void>;
+  deleteMediaLibraryEntry(id: string): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -424,6 +434,40 @@ export class DbStorage implements IStorage {
         adminNotes,
       })
       .where(eq(manualTransactions.id, id));
+  }
+
+  // Media Library
+  async createMediaLibraryEntry(entry: InsertMediaLibrary): Promise<MediaLibrary> {
+    const result = await db.insert(mediaLibrary).values(entry).returning();
+    return result[0];
+  }
+
+  async getUserMediaLibrary(userId: string): Promise<MediaLibrary[]> {
+    return await db
+      .select()
+      .from(mediaLibrary)
+      .where(eq(mediaLibrary.userId, userId))
+      .orderBy(desc(mediaLibrary.createdAt));
+  }
+
+  async getMediaLibraryEntry(id: string): Promise<MediaLibrary | undefined> {
+    const result = await db
+      .select()
+      .from(mediaLibrary)
+      .where(eq(mediaLibrary.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async toggleMediaFavorite(id: string, isFavorite: boolean): Promise<void> {
+    await db
+      .update(mediaLibrary)
+      .set({ isFavorite })
+      .where(eq(mediaLibrary.id, id));
+  }
+
+  async deleteMediaLibraryEntry(id: string): Promise<void> {
+    await db.delete(mediaLibrary).where(eq(mediaLibrary.id, id));
   }
 }
 
