@@ -7,7 +7,7 @@ import path from "path";
 import fs from "fs/promises";
 import archiver from "archiver";
 import axios from "axios";
-import { insertUserSchema, insertProcessingJobSchema } from "@shared/schema";
+import { insertUserSchema, insertProcessingJobSchema, insertCoinPackageSchema } from "@shared/schema";
 
 const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || "http://localhost:5001";
 
@@ -236,6 +236,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ user: updatedUser });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ============== Coin Package Routes (Admin) ==============
+
+  // Get all coin packages (admin gets all, users get active only)
+  app.get("/api/admin/coin-packages", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const currentUser = await storage.getUser(req.session.userId);
+      if (currentUser?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const packages = await storage.getAllCoinPackages();
+      res.json({ packages });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get active coin packages (public for users)
+  app.get("/api/coin-packages", async (req: Request, res: Response) => {
+    try {
+      const packages = await storage.getActiveCoinPackages();
+      res.json({ packages });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create coin package (admin only)
+  app.post("/api/admin/coin-packages", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const currentUser = await storage.getUser(req.session.userId);
+      if (currentUser?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const packageData = insertCoinPackageSchema.parse(req.body);
+      const newPackage = await storage.createCoinPackage(packageData);
+      res.json({ package: newPackage });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Update coin package (admin only)
+  app.patch("/api/admin/coin-packages/:id", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const currentUser = await storage.getUser(req.session.userId);
+      if (currentUser?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      await storage.updateCoinPackage(req.params.id, req.body);
+      const updatedPackage = await storage.getCoinPackage(req.params.id);
+      res.json({ package: updatedPackage });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Delete coin package (admin only)
+  app.delete("/api/admin/coin-packages/:id", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const currentUser = await storage.getUser(req.session.userId);
+      if (currentUser?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      await storage.deleteCoinPackage(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
     }
   });
 
