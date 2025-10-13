@@ -843,6 +843,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============== Usage Quota Routes ==============
+
+  // Get user's quota status
+  app.get("/api/usage/quota", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const quotaStatus = await storage.checkUserQuota(req.session.userId);
+      const user = await storage.getUser(req.session.userId);
+      
+      res.json({
+        ...quotaStatus,
+        tier: user?.userTier || "free",
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to fetch quota" });
+    }
+  });
+
   // ============== Processing Job Routes ==============
 
   // Create processing job and upload images
@@ -865,8 +886,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: "Template ID is required" });
         }
 
-        // Calculate coins needed (2 coins per image)
-        const coinsNeeded = files.length * 2;
+        // Check user quota before processing
+        const quotaStatus = await storage.checkUserQuota(req.session.userId);
+        if (!quotaStatus.hasQuota) {
+          return res.status(403).json({ 
+            message: "Monthly quota exceeded. Please upgrade your plan to process more images.",
+            quota: quotaStatus.quota,
+            used: quotaStatus.used,
+          });
+        }
+
+        if (quotaStatus.remaining < files.length) {
+          return res.status(403).json({ 
+            message: `Insufficient quota. You have ${quotaStatus.remaining} images remaining this month.`,
+            quota: quotaStatus.quota,
+            used: quotaStatus.used,
+            remaining: quotaStatus.remaining,
+          });
+        }
+
+        // Parse batchSettings to get quality setting
+        const parsedSettings = batchSettings ? JSON.parse(batchSettings) : {};
+        const quality = parsedSettings.quality || "standard";
+        
+        // Calculate coins based on quality tier
+        const qualityMultiplier = {
+          standard: 2,
+          high: 3,
+          ultra: 5,
+        }[quality] || 2;
+        
+        const coinsNeeded = files.length * qualityMultiplier;
         
         // Get user and check balance
         const user = await storage.getUser(req.session.userId);
@@ -915,9 +965,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           await storage.addCoinsWithTransaction(req.session.userId, -coinsNeeded, {
             type: "usage",
-            description: `Processed ${files.length} images`,
-            metadata: { jobId: job.id },
+            description: `Processed ${files.length} images (${quality} quality)`,
+            metadata: { jobId: job.id, quality },
           });
+
+          // Increment monthly usage for quota tracking
+          await storage.incrementMonthlyUsage(req.session.userId, files.length);
         } catch (error: any) {
           // If coin deduction fails, clean up the job and images
           await storage.updateProcessingJobStatus(job.id, "failed", 0);

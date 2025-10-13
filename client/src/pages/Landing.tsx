@@ -12,7 +12,10 @@ import {
   Image as ImageIcon,
   Layers,
   Clock,
+  Star,
+  ChevronDown,
 } from "lucide-react";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import earringsWhiteBg from "@assets/WhatsApp Image 2025-10-12 at 14.02.54_bef9f90d_1760283307730.jpg";
 import earringsDarkBg from "@assets/WhatsApp Image 2025-10-12 at 14.03.27_c425ce07_1760283310185.jpg";
 
@@ -91,6 +94,54 @@ export default function Landing() {
         "30% cost savings",
       ],
       popular: false,
+    },
+  ];
+
+  const testimonials = [
+    {
+      name: "Priya Sharma",
+      role: "E-commerce Store Owner",
+      content: "Drisya transformed our product photography workflow. We now process 500+ images per day with professional results. Our conversion rate increased by 35%!",
+      rating: 5,
+    },
+    {
+      name: "Rajesh Kumar",
+      role: "Jewelry Business",
+      content: "The AI background removal is incredibly accurate. It saves us hours of manual editing. The premium templates make our jewelry pieces look stunning online.",
+      rating: 5,
+    },
+    {
+      name: "Anjali Verma",
+      role: "Product Photographer",
+      content: "As a professional photographer, I was skeptical at first. But Drisya's quality and speed are impressive. It's now an essential tool in my workflow.",
+      rating: 5,
+    },
+  ];
+
+  const faqs = [
+    {
+      question: "How does the coin system work?",
+      answer: "Each image processed costs coins based on quality: Standard (2 coins), High (3 coins), or Ultra (5 coins). You buy coin packages that never expire, so you only pay for what you use.",
+    },
+    {
+      question: "What's included in the free trial?",
+      answer: "New users get 100 free coins to test the platform. This allows you to process 50 images at standard quality, or fewer at higher quality levels. No credit card required!",
+    },
+    {
+      question: "Can I upload images in bulk?",
+      answer: "Yes! You can upload up to 1,000 images at once via ZIP file. Our system processes them in batches and provides a downloadable ZIP with all enhanced images.",
+    },
+    {
+      question: "What file formats are supported?",
+      answer: "We support all major image formats including JPG, PNG, JPEG, and WEBP. For best results, we recommend high-resolution source images.",
+    },
+    {
+      question: "How long does processing take?",
+      answer: "Most images are processed within 1-2 minutes. Bulk orders are completed within 10-30 minutes depending on the queue. You'll receive an email notification when your images are ready.",
+    },
+    {
+      question: "Can I get a refund if I'm not satisfied?",
+      answer: "We offer a 7-day money-back guarantee on all coin purchases. If you're not satisfied with the results, contact our support team for a full refund.",
     },
   ];
 
@@ -306,6 +357,60 @@ export default function Landing() {
               All plans include: ✓ No subscription ✓ No expiry ✓ Add coins anytime
             </p>
           </div>
+        </div>
+      </section>
+
+      {/* Testimonials Section */}
+      <section className="py-24">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center space-y-4 mb-16">
+            <h2 className="text-3xl lg:text-4xl font-bold">What Our Customers Say</h2>
+            <p className="text-lg text-muted-foreground">
+              Join thousands of satisfied businesses using Drisya
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {testimonials.map((testimonial, index) => (
+              <Card key={index} className="p-6" data-testid={`testimonial-${index}`}>
+                <div className="flex gap-1 mb-4">
+                  {Array.from({ length: testimonial.rating }).map((_, i) => (
+                    <Star key={i} className="w-5 h-5 fill-primary text-primary" />
+                  ))}
+                </div>
+                <p className="text-muted-foreground mb-6">"{testimonial.content}"</p>
+                <div>
+                  <p className="font-semibold">{testimonial.name}</p>
+                  <p className="text-sm text-muted-foreground">{testimonial.role}</p>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section className="py-24 bg-muted/50">
+        <div className="max-w-4xl mx-auto px-6">
+          <div className="text-center space-y-4 mb-16">
+            <h2 className="text-3xl lg:text-4xl font-bold">Frequently Asked Questions</h2>
+            <p className="text-lg text-muted-foreground">
+              Everything you need to know about Drisya
+            </p>
+          </div>
+
+          <Accordion type="single" collapsible className="space-y-4">
+            {faqs.map((faq, index) => (
+              <AccordionItem key={index} value={`item-${index}`} className="bg-background rounded-lg px-6">
+                <AccordionTrigger className="text-left hover:no-underline" data-testid={`faq-question-${index}`}>
+                  {faq.question}
+                </AccordionTrigger>
+                <AccordionContent className="text-muted-foreground" data-testid={`faq-answer-${index}`}>
+                  {faq.answer}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
         </div>
       </section>
 

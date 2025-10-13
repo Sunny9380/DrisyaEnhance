@@ -57,6 +57,11 @@ export interface IStorage {
     transactionData: Omit<InsertTransaction, "userId" | "amount">
   ): Promise<void>;
 
+  // Usage Quotas
+  checkUserQuota(userId: string): Promise<{ hasQuota: boolean; remaining: number; quota: number; used: number }>;
+  incrementMonthlyUsage(userId: string, imageCount: number): Promise<void>;
+  resetUserQuota(userId: string): Promise<void>;
+
   // Templates
   getAllTemplates(): Promise<Template[]>;
   getTemplate(id: string): Promise<Template | undefined>;
@@ -253,6 +258,70 @@ export class DbStorage implements IStorage {
       totalCoinsPurchased,
       accountAge,
     };
+  }
+
+  // Usage Quotas
+  async checkUserQuota(userId: string): Promise<{ hasQuota: boolean; remaining: number; quota: number; used: number }> {
+    const user = await this.getUser(userId);
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Check if quota needs to be reset (monthly)
+    const now = new Date();
+    const quotaResetDate = new Date(user.quotaResetDate);
+    
+    if (now >= quotaResetDate) {
+      await this.resetUserQuota(userId);
+      // Get updated user data
+      const updatedUser = await this.getUser(userId);
+      if (!updatedUser) throw new Error("User not found");
+      
+      return {
+        hasQuota: updatedUser.monthlyUsage < updatedUser.monthlyQuota || updatedUser.userTier === "enterprise",
+        remaining: updatedUser.userTier === "enterprise" ? 999999 : updatedUser.monthlyQuota - updatedUser.monthlyUsage,
+        quota: updatedUser.userTier === "enterprise" ? 999999 : updatedUser.monthlyQuota,
+        used: updatedUser.monthlyUsage,
+      };
+    }
+
+    // Enterprise tier has unlimited quota
+    if (user.userTier === "enterprise") {
+      return {
+        hasQuota: true,
+        remaining: 999999,
+        quota: 999999,
+        used: user.monthlyUsage,
+      };
+    }
+
+    const remaining = user.monthlyQuota - user.monthlyUsage;
+    return {
+      hasQuota: remaining > 0,
+      remaining: Math.max(0, remaining),
+      quota: user.monthlyQuota,
+      used: user.monthlyUsage,
+    };
+  }
+
+  async incrementMonthlyUsage(userId: string, imageCount: number): Promise<void> {
+    await db
+      .update(users)
+      .set({ monthlyUsage: sql`${users.monthlyUsage} + ${imageCount}` })
+      .where(eq(users.id, userId));
+  }
+
+  async resetUserQuota(userId: string): Promise<void> {
+    const now = new Date();
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    
+    await db
+      .update(users)
+      .set({ 
+        monthlyUsage: 0,
+        quotaResetDate: nextMonth,
+      })
+      .where(eq(users.id, userId));
   }
 
   // Templates

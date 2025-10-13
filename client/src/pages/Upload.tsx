@@ -9,7 +9,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { Info, Coins, Sparkles, FileArchive } from "lucide-react";
+import { Info, Coins, Sparkles, FileArchive, Zap, Crown, Gem } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import type { Template } from "@shared/schema";
 
 export default function Upload() {
@@ -18,12 +20,12 @@ export default function Upload() {
   const zipInputRef = useRef<HTMLInputElement>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>();
   const [files, setFiles] = useState<File[]>([]);
+  const [quality, setQuality] = useState<"standard" | "high" | "ultra">("standard");
   const [batchSettings, setBatchSettings] = useState({
     brightness: 0,
     contrast: 0,
     saturation: 0,
     sharpness: 0,
-    quality: "standard",
   });
 
   // Load selected template from localStorage
@@ -42,7 +44,14 @@ export default function Upload() {
   const templates = templatesData?.templates || [];
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
 
-  const estimatedCoins = files.length * 2;
+  // Calculate coins based on quality tier
+  const qualityMultiplier = {
+    standard: 2,
+    high: 3,
+    ultra: 5,
+  }[quality];
+  
+  const estimatedCoins = files.length * qualityMultiplier;
 
   // ZIP upload and extraction mutation
   const uploadZipMutation = useMutation({
@@ -162,7 +171,7 @@ export default function Upload() {
 
     const formData = new FormData();
     formData.append("templateId", selectedTemplateId);
-    formData.append("batchSettings", JSON.stringify(batchSettings));
+    formData.append("batchSettings", JSON.stringify({ ...batchSettings, quality }));
     
     files.forEach((file) => {
       formData.append("images", file);
@@ -231,6 +240,75 @@ export default function Upload() {
         </Alert>
       )}
 
+      {/* Quality Selector */}
+      {selectedTemplate && (
+        <Card className="p-6">
+          <div className="space-y-4">
+            <div>
+              <Label className="text-base font-semibold">Image Quality</Label>
+              <p className="text-sm text-muted-foreground">
+                Choose the quality level for your processed images
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card 
+                className={`p-4 cursor-pointer hover-elevate ${quality === "standard" ? "border-primary" : ""}`}
+                onClick={() => setQuality("standard")}
+                data-testid="quality-standard"
+              >
+                <div className="flex items-start gap-3">
+                  <Zap className={`w-5 h-5 ${quality === "standard" ? "text-primary" : "text-muted-foreground"}`} />
+                  <div className="flex-1">
+                    <h3 className="font-semibold">Standard</h3>
+                    <p className="text-sm text-muted-foreground mt-1">Good quality for web use</p>
+                    <Badge variant="secondary" className="mt-2">
+                      <Coins className="w-3 h-3 mr-1" />
+                      2 coins/image
+                    </Badge>
+                  </div>
+                </div>
+              </Card>
+
+              <Card 
+                className={`p-4 cursor-pointer hover-elevate ${quality === "high" ? "border-primary" : ""}`}
+                onClick={() => setQuality("high")}
+                data-testid="quality-high"
+              >
+                <div className="flex items-start gap-3">
+                  <Crown className={`w-5 h-5 ${quality === "high" ? "text-primary" : "text-muted-foreground"}`} />
+                  <div className="flex-1">
+                    <h3 className="font-semibold">High</h3>
+                    <p className="text-sm text-muted-foreground mt-1">Better backgrounds & sharpness</p>
+                    <Badge variant="secondary" className="mt-2">
+                      <Coins className="w-3 h-3 mr-1" />
+                      3 coins/image
+                    </Badge>
+                  </div>
+                </div>
+              </Card>
+
+              <Card 
+                className={`p-4 cursor-pointer hover-elevate ${quality === "ultra" ? "border-primary" : ""}`}
+                onClick={() => setQuality("ultra")}
+                data-testid="quality-ultra"
+              >
+                <div className="flex items-start gap-3">
+                  <Gem className={`w-5 h-5 ${quality === "ultra" ? "text-primary" : "text-muted-foreground"}`} />
+                  <div className="flex-1">
+                    <h3 className="font-semibold">Ultra</h3>
+                    <p className="text-sm text-muted-foreground mt-1">Best quality, 4K output</p>
+                    <Badge variant="secondary" className="mt-2">
+                      <Coins className="w-3 h-3 mr-1" />
+                      5 coins/image
+                    </Badge>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          </div>
+        </Card>
+      )}
+
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Upload Images</h2>
@@ -271,12 +349,13 @@ export default function Upload() {
             <Info className="w-4 h-4" />
             <AlertDescription className="flex items-center justify-between">
               <span>
-                Processing <span className="font-mono font-semibold">{files.length}</span> images will cost{" "}
+                Processing <span className="font-mono font-semibold">{files.length}</span> images at{" "}
+                <span className="font-semibold capitalize">{quality}</span> quality will cost{" "}
                 <span className="font-mono font-semibold">{estimatedCoins}</span> coins
               </span>
               <Badge variant="secondary" className="ml-2">
                 <Coins className="w-3 h-3 mr-1" />
-                2 coins/image
+                {qualityMultiplier} coins/image
               </Badge>
             </AlertDescription>
           </Alert>

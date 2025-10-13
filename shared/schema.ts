@@ -14,6 +14,10 @@ export const users = pgTable("users", {
   referralCode: text("referral_code").unique(), // User's unique referral code
   coinBalance: integer("coin_balance").notNull().default(0),
   role: text("role").notNull().default("user"), // user, admin
+  userTier: text("user_tier").notNull().default("free"), // free, basic, pro, enterprise
+  monthlyQuota: integer("monthly_quota").notNull().default(50), // Images per month - Free: 50, Basic: 200, Pro: 1000, Enterprise: unlimited
+  monthlyUsage: integer("monthly_usage").notNull().default(0), // Current month's usage
+  quotaResetDate: timestamp("quota_reset_date").notNull().defaultNow(), // When quota resets
   emailNotifications: boolean("email_notifications").notNull().default(true), // Allow users to opt-out
   notifyJobCompletion: boolean("notify_job_completion").notNull().default(true),
   notifyPaymentConfirmed: boolean("notify_payment_confirmed").notNull().default(true),
@@ -168,6 +172,10 @@ export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   coinBalance: true,
   role: true,
+  userTier: true,
+  monthlyQuota: true,
+  monthlyUsage: true,
+  quotaResetDate: true,
   emailNotifications: true,
   notifyJobCompletion: true,
   notifyPaymentConfirmed: true,

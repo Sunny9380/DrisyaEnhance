@@ -39,7 +39,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User, LogOut } from "lucide-react";
+import { User, LogOut, TrendingUp } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 function PublicRouter() {
   return (
@@ -92,6 +93,16 @@ function AppContent() {
 
   const user = userData?.user;
 
+  // Fetch quota status
+  const { data: quotaData } = useQuery({
+    queryKey: ["/api/usage/quota"],
+    enabled: !isPublicRoute && !!user,
+    retry: false,
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
+
+  const quota = quotaData || { used: 0, quota: 50, remaining: 50, hasQuota: true, tier: "free" };
+
   const style = {
     "--sidebar-width": "20rem",
     "--sidebar-width-icon": "4rem",
@@ -117,6 +128,21 @@ function AppContent() {
           <header className="flex items-center justify-between px-6 py-4 border-b border-border bg-background sticky top-0 z-10">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <div className="flex items-center gap-4">
+              {/* Quota Display */}
+              <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-lg" data-testid="component-quota-display">
+                <TrendingUp className={`w-4 h-4 ${quota.remaining < 3 ? "text-destructive" : "text-chart-2"}`} />
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-mono font-semibold text-xs" data-testid="text-quota-status">
+                    {quota.used}/{quota.quota === 999999 ? "∞" : quota.quota} images
+                  </span>
+                  {quota.remaining < 3 && quota.tier !== "enterprise" && (
+                    <Badge variant="destructive" className="text-xs px-1 py-0 h-4">
+                      Low quota
+                    </Badge>
+                  )}
+                </div>
+              </div>
+
               <CoinBalance
                 balance={user?.coinBalance || 0}
                 onAddCoins={() => setLocation("/wallet")}
