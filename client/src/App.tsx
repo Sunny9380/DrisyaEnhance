@@ -10,11 +10,14 @@ import CoinBalance from "@/components/CoinBalance";
 import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
+import Terms from "@/pages/Terms";
+import Privacy from "@/pages/Privacy";
 import Dashboard from "@/pages/Dashboard";
 import Templates from "@/pages/Templates";
 import Upload from "@/pages/Upload";
 import History from "@/pages/History";
 import Wallet from "@/pages/Wallet";
+import Profile from "@/pages/Profile";
 import Admin from "@/pages/Admin";
 import Analytics from "@/pages/Analytics";
 import Referrals from "@/pages/Referrals";
@@ -25,7 +28,8 @@ import MediaLibrary from "@/pages/MediaLibrary";
 import NotFound from "@/pages/NotFound";
 import NotificationCenter from "@/components/NotificationCenter";
 import KeyboardShortcuts from "@/components/KeyboardShortcuts";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import Footer from "@/components/Footer";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,6 +46,8 @@ function PublicRouter() {
       <Route path="/" component={Landing} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
+      <Route path="/terms" component={Terms} />
+      <Route path="/privacy" component={Privacy} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -56,6 +62,7 @@ function AuthenticatedRouter() {
       <Route path="/history" component={History} />
       <Route path="/media-library" component={MediaLibrary} />
       <Route path="/wallet" component={Wallet} />
+      <Route path="/profile" component={Profile} />
       <Route path="/analytics" component={Analytics} />
       <Route path="/referrals" component={Referrals} />
       <Route path="/team" component={Team} />
@@ -70,8 +77,8 @@ function AuthenticatedRouter() {
 function AppContent() {
   const [location, setLocation] = useLocation();
   
-  // Public routes (landing, login, register)
-  const publicRoutes = ["/", "/login", "/register"];
+  // Public routes (landing, login, register, legal pages)
+  const publicRoutes = ["/", "/login", "/register", "/terms", "/privacy"];
   const isPublicRoute = publicRoutes.includes(location);
 
   // Fetch current user
@@ -90,10 +97,13 @@ function AppContent() {
 
   if (isPublicRoute) {
     return (
-      <>
-        <PublicRouter />
+      <div className="flex flex-col min-h-screen">
+        <main className="flex-1">
+          <PublicRouter />
+        </main>
+        <Footer />
         <Toaster />
-      </>
+      </div>
     );
   }
 
@@ -115,6 +125,7 @@ function AppContent() {
                 <DropdownMenuTrigger asChild>
                   <button className="focus:outline-none" data-testid="button-user-menu">
                     <Avatar className="w-9 h-9 cursor-pointer hover-elevate active-elevate-2">
+                      <AvatarImage src={user?.avatarUrl || undefined} />
                       <AvatarFallback className="bg-primary text-primary-foreground">
                         {user?.name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || "U"}
                       </AvatarFallback>
@@ -124,7 +135,10 @@ function AppContent() {
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem data-testid="menu-profile">
+                  <DropdownMenuItem 
+                    onClick={() => setLocation("/profile")}
+                    data-testid="menu-profile"
+                  >
                     <User className="w-4 h-4 mr-2" />
                     Profile
                   </DropdownMenuItem>

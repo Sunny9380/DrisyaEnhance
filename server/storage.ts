@@ -39,6 +39,14 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
+  updateUserProfile(userId: string, data: Partial<Pick<User, 'name' | 'phone' | 'avatarUrl' | 'emailNotifications' | 'notifyJobCompletion' | 'notifyPaymentConfirmed' | 'notifyCoinsAdded'>>): Promise<User>;
+  getUserStats(userId: string): Promise<{
+    totalJobs: number;
+    totalImagesProcessed: number;
+    totalCoinsSpent: number;
+    totalCoinsPurchased: number;
+    accountAge: number;
+  }>;
   updateUserCoins(userId: string, amount: number): Promise<void>;
   addCoinsWithTransaction(
     userId: string,
@@ -162,6 +170,72 @@ export class DbStorage implements IStorage {
         ...transactionData,
       });
     });
+  }
+
+  async updateUserProfile(
+    userId: string, 
+    data: Partial<Pick<User, 'name' | 'phone' | 'avatarUrl' | 'emailNotifications' | 'notifyJobCompletion' | 'notifyPaymentConfirmed' | 'notifyCoinsAdded'>>
+  ): Promise<User> {
+    const result = await db
+      .update(users)
+      .set(data)
+      .where(eq(users.id, userId))
+      .returning();
+    
+    if (result.length === 0) {
+      throw new Error("User not found");
+    }
+    
+    return result[0];
+  }
+
+  async getUserStats(userId: string): Promise<{
+    totalJobs: number;
+    totalImagesProcessed: number;
+    totalCoinsSpent: number;
+    totalCoinsPurchased: number;
+    accountAge: number;
+  }> {
+    const user = await this.getUser(userId);
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const jobs = await db
+      .select()
+      .from(processingJobs)
+      .where(eq(processingJobs.userId, userId));
+
+    const totalJobs = jobs.length;
+    const totalImagesProcessed = jobs.reduce((sum, job) => sum + job.processedImages, 0);
+    const totalCoinsSpent = jobs.reduce((sum, job) => sum + job.coinsUsed, 0);
+
+    const purchaseTransactions = await db
+      .select()
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.userId, userId),
+          eq(transactions.type, "purchase")
+        )
+      );
+
+    const totalCoinsPurchased = purchaseTransactions.reduce(
+      (sum, txn) => sum + (txn.amount > 0 ? txn.amount : 0),
+      0
+    );
+
+    const accountAge = Math.floor(
+      (Date.now() - user.createdAt.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    return {
+      totalJobs,
+      totalImagesProcessed,
+      totalCoinsSpent,
+      totalCoinsPurchased,
+      accountAge,
+    };
   }
 
   // Templates

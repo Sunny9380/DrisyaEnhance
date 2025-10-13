@@ -132,17 +132,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Hash password
       const hashedPassword = await bcrypt.hash(validatedData.password, 10);
 
-      // Create user with initial coin balance
+      // Create user with trial bonus flag
       const user = await storage.createUser({
         ...validatedData,
         password: hashedPassword,
+        isTrialUsed: true,
       });
 
       // Give welcome bonus coins (atomic transaction)
       await storage.addCoinsWithTransaction(user.id, 100, {
-        type: "purchase",
+        type: "trial_bonus",
         description: "Welcome bonus - 100 free coins",
-        metadata: { source: "welcome_bonus" },
+        metadata: { source: "trial_bonus" },
       });
 
       // Set session
@@ -220,8 +221,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     res.json({
-      user: { id: user.id, email: user.email, name: user.name, coinBalance: user.coinBalance, role: user.role },
+      user: { id: user.id, email: user.email, name: user.name, coinBalance: user.coinBalance, role: user.role, avatarUrl: user.avatarUrl },
     });
+  });
+
+  // ============== Profile Routes ==============
+
+  // Configure multer for avatar uploads
+  const avatarUpload = multer({
+    dest: "uploads/avatars/",
+    limits: { fileSize: 2 * 1024 * 1024 }, // 2MB limit
+    fileFilter: (req, file, cb) => {
+      const allowedTypes = ["image/jpeg", "image/jpg", "image/png"];
+      if (allowedTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error("Only JPG and PNG images are allowed"));
+      }
+    },
+  });
+
+  // Get user profile
+  app.get("/api/profile", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const { password, ...userWithoutPassword } = user;
+      res.json({ user: userWithoutPassword });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update user profile
+  app.put("/api/profile", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { name, phone, emailNotifications, notifyJobCompletion, notifyPaymentConfirmed, notifyCoinsAdded } = req.body;
+
+      const updatedUser = await storage.updateUserProfile(req.session.userId, {
+        name,
+        phone,
+        emailNotifications,
+        notifyJobCompletion,
+        notifyPaymentConfirmed,
+        notifyCoinsAdded,
+      });
+
+      const { password, ...userWithoutPassword } = updatedUser;
+      res.json({ user: userWithoutPassword });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Upload avatar
+  app.post("/api/profile/avatar", avatarUpload.single("avatar"), async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+      
+      const updatedUser = await storage.updateUserProfile(req.session.userId, {
+        avatarUrl,
+      });
+
+      const { password, ...userWithoutPassword } = updatedUser;
+      res.json({ user: userWithoutPassword });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get user statistics
+  app.get("/api/profile/stats", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const stats = await storage.getUserStats(req.session.userId);
+      res.json({ stats });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
   });
 
   // ============== Admin Routes ==============

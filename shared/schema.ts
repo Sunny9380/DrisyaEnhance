@@ -10,12 +10,14 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   name: text("name"),
   phone: text("phone"), // WhatsApp number for admin contact
+  avatarUrl: text("avatar_url"), // Profile avatar image URL
   coinBalance: integer("coin_balance").notNull().default(0),
   role: text("role").notNull().default("user"), // user, admin
   emailNotifications: boolean("email_notifications").notNull().default(true), // Allow users to opt-out
   notifyJobCompletion: boolean("notify_job_completion").notNull().default(true),
   notifyPaymentConfirmed: boolean("notify_payment_confirmed").notNull().default(true),
   notifyCoinsAdded: boolean("notify_coins_added").notNull().default(true),
+  isTrialUsed: boolean("is_trial_used").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
