@@ -126,23 +126,76 @@ export default function Templates() {
           {filteredTemplates.map((template) => (
             <Card
               key={template.id}
-              className={`group cursor-pointer transition-all hover-elevate active-elevate-2 ${
+              className={`group cursor-pointer transition-all hover-elevate active-elevate-2 overflow-hidden ${
                 selectedTemplate === template.id ? 'ring-2 ring-primary' : ''
               }`}
               onClick={() => handleSelectTemplate(template.id)}
               data-testid={`template-card-${template.id}`}
             >
+              {/* Visual Preview */}
+              <div 
+                className="relative h-48 flex items-center justify-center overflow-hidden"
+                style={{
+                  background: template.settings?.gradientColors && template.settings.gradientColors.length > 1
+                    ? `linear-gradient(135deg, ${template.settings.gradientColors.join(', ')})`
+                    : template.backgroundStyle === 'velvet' 
+                      ? 'linear-gradient(135deg, #1a0a1f 0%, #3d1f4d 100%)'
+                      : template.backgroundStyle === 'marble'
+                        ? 'linear-gradient(135deg, #e0e0e0 0%, #f5f5f5 50%, #d0d0d0 100%)'
+                        : template.backgroundStyle === 'minimal'
+                          ? '#ffffff'
+                          : template.backgroundStyle === 'festive'
+                            ? 'linear-gradient(135deg, #ff6b6b 0%, #ffd93d 100%)'
+                            : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                }}
+              >
+                {/* Lighting Effect Overlay */}
+                <div 
+                  className="absolute inset-0"
+                  style={{
+                    background: template.lightingPreset === 'moody'
+                      ? 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.15) 0%, transparent 60%)'
+                      : template.lightingPreset === 'soft-glow'
+                        ? 'radial-gradient(circle at center, rgba(255,255,255,0.2) 0%, transparent 70%)'
+                        : template.lightingPreset === 'spotlight'
+                          ? 'radial-gradient(circle at 50% 20%, rgba(255,255,255,0.4) 0%, transparent 50%)'
+                          : 'linear-gradient(to bottom, rgba(255,255,255,0.1) 0%, transparent 100%)',
+                  }}
+                />
+                
+                {/* Product Placeholder */}
+                <div className="relative z-10 w-32 h-32 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center border border-white/30">
+                  <Sparkles className="h-12 w-12 text-white/80" />
+                </div>
+
+                {/* Premium Badge */}
+                {template.isPremium && (
+                  <div className="absolute top-2 right-2 bg-amber-500 text-white px-2 py-1 rounded-full flex items-center gap-1 text-xs font-semibold">
+                    <Crown className="h-3 w-3" />
+                    Premium
+                  </div>
+                )}
+
+                {/* Selection Indicator */}
+                {selectedTemplate === template.id && (
+                  <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                    <div className="bg-primary text-primary-foreground px-4 py-2 rounded-full font-semibold flex items-center gap-2">
+                      <Star className="h-4 w-4 fill-current" />
+                      Selected
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Info Section */}
               <div className="p-4 space-y-3">
                 {/* Header */}
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-lg">{template.name}</h3>
-                    <p className="text-sm text-muted-foreground mt-1">
+                <div>
+                  <h3 className="font-semibold text-lg">{template.name}</h3>
+                  {template.description && (
+                    <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
                       {template.description}
                     </p>
-                  </div>
-                  {template.isPremium && (
-                    <Crown className="h-5 w-5 text-amber-500" data-testid="icon-premium" />
                   )}
                 </div>
 
@@ -159,19 +212,6 @@ export default function Templates() {
                     {template.lightingPreset}
                   </Badge>
                 </div>
-
-                {/* Preview Colors (if gradient) */}
-                {template.settings?.gradientColors && (
-                  <div className="flex gap-2 mt-2">
-                    {template.settings.gradientColors.slice(0, 3).map((color: string, idx: number) => (
-                      <div
-                        key={idx}
-                        className="w-8 h-8 rounded-md border"
-                        style={{ backgroundColor: color }}
-                      />
-                    ))}
-                  </div>
-                )}
 
                 {/* Category */}
                 <div className="pt-2 border-t">
