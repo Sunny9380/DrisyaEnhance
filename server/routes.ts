@@ -1152,7 +1152,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get user's jobs
+  // Get user's jobs with images
   app.get("/api/jobs", async (req: Request, res: Response) => {
     if (!req.session.userId) {
       return res.status(401).json({ message: "Not authenticated" });
@@ -1160,7 +1160,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const jobs = await storage.getUserProcessingJobs(req.session.userId);
-      res.json({ jobs });
+      
+      // Fetch images for each job and attach template info
+      const jobsWithImages = await Promise.all(
+        jobs.map(async (job) => {
+          const images = await storage.getJobImages(job.id);
+          const template = await storage.getTemplate(job.templateId);
+          return {
+            ...job,
+            images,
+            templateName: template?.name || "Unknown Template",
+          };
+        })
+      );
+      
+      res.json({ jobs: jobsWithImages });
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to fetch jobs" });
     }
@@ -1213,6 +1227,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.download(zipPath, `drisya-job-${job.id}.zip`);
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to download" });
+    }
+  });
+
+  // Delete individual image
+  app.delete("/api/images/:id", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      await storage.deleteImage(req.params.id, req.session.userId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to delete image" });
+    }
+  });
+
+  // Bulk download images as ZIP
+  app.post("/api/gallery/bulk-download", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const { imageIds } = req.body;
+    
+    if (!imageIds || !Array.isArray(imageIds) || imageIds.length === 0) {
+      return res.status(400).json({ message: "Image IDs required" });
+    }
+
+    try {
+      // Get images from database (with auth check)
+      const images = await storage.getImagesByIds(imageIds, req.session.userId);
+      
+      if (images.length === 0) {
+        return res.status(404).json({ message: "No images found" });
+      }
+
+      // Create ZIP archive
+      const archive = archiver('zip', { zlib: { level: 9 } });
+      
+      res.attachment(`gallery-export-${Date.now()}.zip`);
+      archive.pipe(res);
+
+      // Add each processed image to ZIP
+      for (const image of images) {
+        if (image.processedUrl) {
+          const imagePath = path.join(process.cwd(), image.processedUrl);
+          const originalName = image.originalUrl?.split('/').pop()?.split('-').slice(1).join('-') || `image-${image.id}.png`;
+          
+          try {
+            // Check if file exists before adding
+            await fs.access(imagePath);
+            archive.file(imagePath, { name: originalName });
+          } catch (err) {
+            console.error(`File not found: ${imagePath}`);
+          }
+        }
+      }
+
+      await archive.finalize();
+    } catch (error: any) {
+      console.error("Bulk download error:", error);
+      res.status(500).json({ message: error.message || "Failed to create ZIP" });
     }
   });
 

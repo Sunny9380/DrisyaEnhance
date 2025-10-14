@@ -40,7 +40,7 @@ import {
   aiEdits,
   aiUsageLedger,
 } from "@shared/schema";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, sql, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // Users
@@ -87,7 +87,9 @@ export interface IStorage {
   // Images
   createImage(image: InsertImage): Promise<Image>;
   getJobImages(jobId: string): Promise<Image[]>;
+  getImagesByIds(imageIds: string[], userId: string): Promise<Image[]>;
   updateImageStatus(id: string, status: string, processedUrl?: string): Promise<void>;
+  deleteImage(id: string, userId: string): Promise<void>;
 
   // Transactions
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
@@ -407,6 +409,24 @@ export class DbStorage implements IStorage {
     return await db.select().from(images).where(eq(images.jobId, jobId));
   }
 
+  async getImagesByIds(imageIds: string[], userId: string): Promise<Image[]> {
+    // Get images that belong to jobs owned by this user
+    const result = await db
+      .select({
+        image: images,
+      })
+      .from(images)
+      .innerJoin(processingJobs, eq(images.jobId, processingJobs.id))
+      .where(
+        and(
+          inArray(images.id, imageIds),
+          eq(processingJobs.userId, userId)
+        )
+      );
+    
+    return result.map(r => r.image);
+  }
+
   async updateImageStatus(id: string, status: string, processedUrl?: string): Promise<void> {
     const updateData: any = { status };
     if (processedUrl) {
@@ -414,6 +434,27 @@ export class DbStorage implements IStorage {
     }
 
     await db.update(images).set(updateData).where(eq(images.id, id));
+  }
+
+  async deleteImage(id: string, userId: string): Promise<void> {
+    // Only delete if the image belongs to a job owned by this user
+    const result = await db
+      .select({ jobId: images.jobId })
+      .from(images)
+      .innerJoin(processingJobs, eq(images.jobId, processingJobs.id))
+      .where(
+        and(
+          eq(images.id, id),
+          eq(processingJobs.userId, userId)
+        )
+      )
+      .limit(1);
+
+    if (result.length === 0) {
+      throw new Error("Image not found or access denied");
+    }
+
+    await db.delete(images).where(eq(images.id, id));
   }
 
   // Transactions

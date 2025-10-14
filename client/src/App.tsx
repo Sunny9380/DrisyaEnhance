@@ -16,6 +16,7 @@ import Dashboard from "@/pages/Dashboard";
 import Templates from "@/pages/Templates";
 import Upload from "@/pages/Upload";
 import History from "@/pages/History";
+import Gallery from "@/pages/Gallery";
 import Wallet from "@/pages/Wallet";
 import Profile from "@/pages/Profile";
 import Admin from "@/pages/Admin";
@@ -62,6 +63,7 @@ function AuthenticatedRouter() {
       <Route path="/templates" component={Templates} />
       <Route path="/upload" component={Upload} />
       <Route path="/history" component={History} />
+      <Route path="/gallery" component={Gallery} />
       <Route path="/media-library" component={MediaLibrary} />
       <Route path="/wallet" component={Wallet} />
       <Route path="/profile" component={Profile} />
@@ -85,7 +87,7 @@ function AppContent() {
   const isPublicRoute = publicRoutes.includes(location);
 
   // Fetch current user
-  const { data: userData } = useQuery({
+  const { data: userData } = useQuery<{ user: any }>({
     queryKey: ["/api/auth/me"],
     enabled: !isPublicRoute,
     retry: false,
@@ -94,7 +96,7 @@ function AppContent() {
   const user = userData?.user;
 
   // Fetch quota status
-  const { data: quotaData } = useQuery({
+  const { data: quotaData } = useQuery<{ used: number; quota: number; remaining: number; hasQuota: boolean; tier: string }>({
     queryKey: ["/api/usage/quota"],
     enabled: !isPublicRoute && !!user,
     retry: false,

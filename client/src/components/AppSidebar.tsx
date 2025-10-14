@@ -22,6 +22,7 @@ import {
   Plug,
   Code,
   ImagePlus,
+  FileImage,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 
@@ -30,6 +31,7 @@ const menuItems = [
   { title: "Templates", url: "/templates", icon: Images },
   { title: "Upload", url: "/upload", icon: Upload },
   { title: "History", url: "/history", icon: History },
+  { title: "Gallery", url: "/gallery", icon: FileImage },
   { title: "Media Library", url: "/media-library", icon: ImagePlus },
   { title: "Wallet", url: "/wallet", icon: Wallet },
 ];
