@@ -18,15 +18,19 @@ export default function Footer() {
           <div>
             <h3 className="text-sm font-semibold mb-4">Legal</h3>
             <nav className="space-y-2">
-              <Link href="/terms">
-                <a className="block text-sm text-muted-foreground hover:text-foreground transition-colors" data-testid="link-footer-terms">
-                  Terms of Service
-                </a>
+              <Link 
+                href="/terms"
+                className="block text-sm text-muted-foreground hover:text-foreground transition-colors" 
+                data-testid="link-footer-terms"
+              >
+                Terms of Service
               </Link>
-              <Link href="/privacy">
-                <a className="block text-sm text-muted-foreground hover:text-foreground transition-colors" data-testid="link-footer-privacy">
-                  Privacy Policy
-                </a>
+              <Link 
+                href="/privacy"
+                className="block text-sm text-muted-foreground hover:text-foreground transition-colors" 
+                data-testid="link-footer-privacy"
+              >
+                Privacy Policy
               </Link>
             </nav>
           </div>
