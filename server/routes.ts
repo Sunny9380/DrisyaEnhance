@@ -1662,6 +1662,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
+  // Upload single image for AI transform
+  app.post(
+    "/api/upload/single",
+    upload.single("image"),
+    async (req: Request, res: Response) => {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      try {
+        if (!req.file) {
+          return res.status(400).json({ message: "No image file provided" });
+        }
+
+        const imageUrl = `/uploads/${req.file.filename}`;
+        
+        res.json({ 
+          success: true,
+          imageUrl,
+          filename: req.file.originalname
+        });
+      } catch (error: any) {
+        console.error("Single image upload error:", error);
+        res.status(500).json({ message: error.message || "Failed to upload image" });
+      }
+    }
+  );
+
   // ============== Media Library Routes ==============
 
   // Get user's media library

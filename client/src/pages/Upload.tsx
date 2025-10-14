@@ -268,11 +268,32 @@ export default function Upload() {
     },
   });
 
+  // Upload single image to get URL for AI transform
+  const uploadSingleImageMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("image", file);
+      
+      const res = await fetch("/api/upload/single", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || res.statusText);
+      }
+      
+      return await res.json();
+    },
+  });
+
   // AI edit mutation
   const aiEditMutation = useMutation({
-    mutationFn: async ({ imageId, prompt, aiModel }: { imageId: string; prompt: string; aiModel: string }) => {
+    mutationFn: async ({ inputImageUrl, prompt, aiModel }: { inputImageUrl: string; prompt: string; aiModel: string }) => {
       const res = await apiRequest("POST", "/api/ai-edits", {
-        imageId,
+        inputImageUrl,
         prompt,
         aiModel,
       });
@@ -284,6 +305,7 @@ export default function Upload() {
         description: "Your image is being transformed. Check history for results.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/ai-usage"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ai-edits"] });
       setAiPrompt("");
     },
     onError: (error: Error) => {
@@ -347,13 +369,23 @@ export default function Upload() {
       return;
     }
 
-    const placeholderImageId = "temp-" + Date.now();
-    
-    aiEditMutation.mutate({
-      imageId: placeholderImageId,
-      prompt: aiPrompt,
-      aiModel: aiModel,
-    });
+    try {
+      // First, upload the image to get a URL
+      const uploadResult = await uploadSingleImageMutation.mutateAsync(files[0]);
+      
+      // Then trigger the AI edit with the uploaded image URL
+      aiEditMutation.mutate({
+        inputImageUrl: uploadResult.imageUrl,
+        prompt: aiPrompt,
+        aiModel: aiModel,
+      });
+    } catch (error: any) {
+      toast({
+        title: "❌ Upload failed",
+        description: error.message || "Failed to upload image for AI transform",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleCloneEdit = (edit: AIEdit) => {
