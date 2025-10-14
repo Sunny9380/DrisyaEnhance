@@ -292,6 +292,7 @@ export const insertMediaLibrarySchema = createInsertSchema(mediaLibrary).omit({
 
 export const insertAIEditSchema = createInsertSchema(aiEdits).omit({
   id: true,
+  userId: true, // Added by backend from session
   status: true,
   outputImageUrl: true,
   cost: true,
