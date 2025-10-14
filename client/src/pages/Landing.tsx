@@ -1,162 +1,87 @@
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
+import { motion, useScroll, useTransform, useSpring, useInView } from "framer-motion";
+import { useRef } from "react";
 import {
   Sparkles,
-  Zap,
-  Shield,
-  TrendingUp,
-  CheckCircle,
   ArrowRight,
   Image as ImageIcon,
   Layers,
-  Clock,
-  Star,
+  Zap,
   ChevronDown,
 } from "lucide-react";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import earringsWhiteBg from "@assets/WhatsApp Image 2025-10-12 at 14.02.54_bef9f90d_1760283307730.jpg";
 import earringsDarkBg from "@assets/WhatsApp Image 2025-10-12 at 14.03.27_c425ce07_1760283310185.jpg";
+import ThemeToggle from "@/components/ThemeToggle";
+
+// Section component with scroll-triggered reveal
+function ScrollSection({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, amount: 0.3 });
+
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 50 }}
+      animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 50 }}
+      transition={{ duration: 0.8, ease: "easeOut" }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+// Parallax text component
+function ParallaxText({ children, offset = 50 }: { children: React.ReactNode; offset?: number }) {
+  const ref = useRef(null);
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start end", "end start"],
+  });
+
+  const y = useTransform(scrollYProgress, [0, 1], [0, -offset]);
+  const springY = useSpring(y, { stiffness: 100, damping: 30 });
+
+  return (
+    <motion.div ref={ref} style={{ y: springY }}>
+      {children}
+    </motion.div>
+  );
+}
 
 export default function Landing() {
-  const features = [
-    {
-      icon: Sparkles,
-      title: "AI-Powered Enhancement",
-      description: "Advanced algorithms automatically enhance image quality, colors, and lighting",
-    },
-    {
-      icon: Layers,
-      title: "Background Removal",
-      description: "Professional-grade background removal with edge detection",
-    },
-    {
-      icon: ImageIcon,
-      title: "100+ Templates",
-      description: "Choose from our extensive library of premium backgrounds",
-    },
-    {
-      icon: Zap,
-      title: "Bulk Processing",
-      description: "Process thousands of images simultaneously with our queue system",
-    },
-    {
-      icon: Clock,
-      title: "Fast Turnaround",
-      description: "Get your processed images in minutes, not hours",
-    },
-    {
-      icon: Shield,
-      title: "Secure & Reliable",
-      description: "Enterprise-grade security for your valuable product images",
-    },
-  ];
+  const heroRef = useRef(null);
+  const { scrollYProgress } = useScroll({
+    target: heroRef,
+    offset: ["start start", "end start"],
+  });
 
-  const pricingPlans = [
-    {
-      name: "Starter",
-      price: "₹499",
-      coins: 500,
-      features: [
-        "500 coin balance",
-        "~250 images processed",
-        "All templates access",
-        "Basic support",
-        "Download as ZIP",
-      ],
-      popular: false,
-    },
-    {
-      name: "Professional",
-      price: "₹1,599",
-      coins: 2000,
-      features: [
-        "2,000 coin balance",
-        "~1,000 images processed",
-        "All templates access",
-        "Priority support",
-        "Bulk upload (ZIP)",
-        "20% cost savings",
-      ],
-      popular: true,
-    },
-    {
-      name: "Enterprise",
-      price: "₹3,499",
-      coins: 5000,
-      features: [
-        "5,000 coin balance",
-        "~2,500 images processed",
-        "All templates access",
-        "Dedicated support",
-        "Custom templates",
-        "30% cost savings",
-      ],
-      popular: false,
-    },
-  ];
-
-  const testimonials = [
-    {
-      name: "Priya Sharma",
-      role: "E-commerce Store Owner",
-      content: "Drisya transformed our product photography workflow. We now process 500+ images per day with professional results. Our conversion rate increased by 35%!",
-      rating: 5,
-    },
-    {
-      name: "Rajesh Kumar",
-      role: "Jewelry Business",
-      content: "The AI background removal is incredibly accurate. It saves us hours of manual editing. The premium templates make our jewelry pieces look stunning online.",
-      rating: 5,
-    },
-    {
-      name: "Anjali Verma",
-      role: "Product Photographer",
-      content: "As a professional photographer, I was skeptical at first. But Drisya's quality and speed are impressive. It's now an essential tool in my workflow.",
-      rating: 5,
-    },
-  ];
-
-  const faqs = [
-    {
-      question: "How does the coin system work?",
-      answer: "Each image processed costs coins based on quality: Standard (2 coins), High (3 coins), or Ultra (5 coins). You buy coin packages that never expire, so you only pay for what you use.",
-    },
-    {
-      question: "What's included in the free trial?",
-      answer: "New users get 100 free coins to test the platform. This allows you to process 50 images at standard quality, or fewer at higher quality levels. No credit card required!",
-    },
-    {
-      question: "Can I upload images in bulk?",
-      answer: "Yes! You can upload up to 1,000 images at once via ZIP file. Our system processes them in batches and provides a downloadable ZIP with all enhanced images.",
-    },
-    {
-      question: "What file formats are supported?",
-      answer: "We support all major image formats including JPG, PNG, JPEG, and WEBP. For best results, we recommend high-resolution source images.",
-    },
-    {
-      question: "How long does processing take?",
-      answer: "Most images are processed within 1-2 minutes. Bulk orders are completed within 10-30 minutes depending on the queue. You'll receive an email notification when your images are ready.",
-    },
-    {
-      question: "Can I get a refund if I'm not satisfied?",
-      answer: "We offer a 7-day money-back guarantee on all coin purchases. If you're not satisfied with the results, contact our support team for a full refund.",
-    },
-  ];
+  const heroOpacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
+  const heroScale = useTransform(scrollYProgress, [0, 0.5], [1, 0.95]);
+  const heroY = useTransform(scrollYProgress, [0, 1], [0, -100]);
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Navigation */}
-      <nav className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-50">
+      {/* Minimal Navigation */}
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="flex items-center gap-2"
+          >
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
               <span className="text-primary-foreground font-bold text-lg">D</span>
             </div>
             <h1 className="font-bold text-xl">Drisya</h1>
-          </div>
-          <div className="flex items-center gap-4">
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="flex items-center gap-4"
+          >
+            <ThemeToggle />
             <Link href="/login">
               <Button variant="ghost" data-testid="button-nav-login">
                 Login
@@ -165,317 +90,278 @@ export default function Landing() {
             <Link href="/register">
               <Button data-testid="button-nav-register">Get Started</Button>
             </Link>
-          </div>
+          </motion.div>
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-background" />
-        <div className="relative max-w-7xl mx-auto px-6 py-24 lg:py-32">
-          <div className="text-center space-y-8 max-w-4xl mx-auto">
-            <Badge className="mx-auto bg-primary/10 text-primary border-primary/20">
-              AI-Powered Image Enhancement
-            </Badge>
-            <h1 className="text-4xl lg:text-6xl font-bold tracking-tight">
-              Transform Your Product Photography
-              <span className="block text-primary mt-2">In Minutes, Not Hours</span>
-            </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Professional background removal, enhancement, and template placement
-              for e-commerce, jewelry, and product photography
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/register">
-                <Button size="lg" className="text-lg px-8" data-testid="button-hero-start">
-                  Start Free Trial
-                  <ArrowRight className="ml-2 w-5 h-5" />
-                </Button>
-              </Link>
-              <Button
-                variant="outline"
-                size="lg"
-                className="text-lg px-8"
-                onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
-                data-testid="button-hero-learn"
-              >
-                Learn More
-              </Button>
-            </div>
-          </div>
+      {/* Hero Section with Parallax */}
+      <section
+        ref={heroRef}
+        className="relative min-h-screen flex items-center justify-center overflow-hidden"
+      >
+        <motion.div
+          style={{ opacity: heroOpacity, scale: heroScale, y: heroY }}
+          className="relative z-10 text-center px-6 max-w-5xl mx-auto"
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.8 }}
+            className="inline-flex items-center gap-2 px-4 py-2 mb-8 rounded-full bg-primary/10 backdrop-blur-sm border border-primary/20"
+          >
+            <Sparkles className="w-4 h-4 text-primary" />
+            <span className="text-sm font-medium">AI-Powered Image Enhancement</span>
+          </motion.div>
 
-          {/* Product Showcase */}
-          <div className="mt-20 grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            <Card className="overflow-hidden">
-              <div className="aspect-square bg-white relative">
-                <img
-                  src={earringsWhiteBg}
-                  alt="Before processing"
-                  className="w-full h-full object-contain p-8"
-                />
-                <div className="absolute top-4 left-4">
-                  <Badge variant="secondary">Before</Badge>
-                </div>
-              </div>
-            </Card>
-            <Card className="overflow-hidden ring-2 ring-primary">
-              <div className="aspect-square bg-gradient-to-br from-slate-900 to-slate-800 relative">
-                <img
-                  src={earringsDarkBg}
-                  alt="After processing"
-                  className="w-full h-full object-contain p-8"
-                />
-                <div className="absolute top-4 left-4">
-                  <Badge className="bg-primary text-primary-foreground">After - Enhanced</Badge>
-                </div>
-              </div>
-            </Card>
-          </div>
-        </div>
-      </section>
+          <ParallaxText offset={30}>
+            <motion.h1
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3, duration: 1 }}
+              className="text-6xl md:text-8xl lg:text-9xl font-bold mb-8 tracking-tight"
+            >
+              <span className="block text-foreground/90">Unique</span>
+              <span className="block bg-gradient-to-r from-primary via-primary/80 to-primary bg-clip-text text-transparent">
+                Imagery
+              </span>
+            </motion.h1>
+          </ParallaxText>
 
-      {/* Features Section */}
-      <section id="features" className="py-24 bg-muted/50">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center space-y-4 mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold">
-              Everything You Need for Professional Results
-            </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Powerful features designed for e-commerce businesses, jewelry stores, and product photographers
-            </p>
-          </div>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5, duration: 1 }}
+            className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto mb-12 leading-relaxed"
+          >
+            Transform your product photos with professional AI backgrounds,
+            lighting effects, and instant enhancements. Elevate your e-commerce
+            visuals to luxury standards.
+          </motion.p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {features.map((feature, index) => (
-              <Card key={index} className="p-6 hover-elevate" data-testid={`feature-${index}`}>
-                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
-                  <feature.icon className="w-6 h-6 text-primary" />
-                </div>
-                <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
-                <p className="text-muted-foreground">{feature.description}</p>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* How It Works */}
-      <section className="py-24">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center space-y-4 mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold">How It Works</h2>
-            <p className="text-lg text-muted-foreground">
-              Simple 3-step process to transform your images
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="text-center space-y-4">
-              <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto text-2xl font-bold text-primary-foreground">
-                1
-              </div>
-              <h3 className="text-xl font-semibold">Select Template</h3>
-              <p className="text-muted-foreground">
-                Choose from 100+ professional background templates
-              </p>
-            </div>
-            <div className="text-center space-y-4">
-              <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto text-2xl font-bold text-primary-foreground">
-                2
-              </div>
-              <h3 className="text-xl font-semibold">Upload Images</h3>
-              <p className="text-muted-foreground">
-                Bulk upload up to 1,000 images via ZIP or individual files
-              </p>
-            </div>
-            <div className="text-center space-y-4">
-              <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto text-2xl font-bold text-primary-foreground">
-                3
-              </div>
-              <h3 className="text-xl font-semibold">Download Results</h3>
-              <p className="text-muted-foreground">
-                Get professionally enhanced images ready for your store
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing Section */}
-      <section id="pricing" className="py-24 bg-muted/50">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center space-y-4 mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold">Simple, Transparent Pricing</h2>
-            <p className="text-lg text-muted-foreground">
-              Pay only for what you use with our coin-based system
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {pricingPlans.map((plan, index) => (
-              <Card
-                key={index}
-                className={`p-8 relative ${plan.popular ? "ring-2 ring-primary" : ""}`}
-                data-testid={`pricing-plan-${index}`}
-              >
-                {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                    <Badge className="bg-primary text-primary-foreground">Most Popular</Badge>
-                  </div>
-                )}
-                <div className="text-center mb-6">
-                  <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
-                  <div className="flex items-baseline justify-center gap-1 mb-1">
-                    <span className="text-4xl font-bold">{plan.price}</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{plan.coins} coins</p>
-                </div>
-                <ul className="space-y-3 mb-8">
-                  {plan.features.map((feature, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <CheckCircle className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                      <span className="text-sm">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-                <Link href="/register">
-                  <Button
-                    className="w-full"
-                    variant={plan.popular ? "default" : "outline"}
-                    data-testid={`button-select-${plan.name.toLowerCase()}`}
-                  >
-                    Get Started
-                  </Button>
-                </Link>
-              </Card>
-            ))}
-          </div>
-
-          <div className="text-center mt-12">
-            <p className="text-sm text-muted-foreground">
-              All plans include: ✓ No subscription ✓ No expiry ✓ Add coins anytime
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials Section */}
-      <section className="py-24">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center space-y-4 mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold">What Our Customers Say</h2>
-            <p className="text-lg text-muted-foreground">
-              Join thousands of satisfied businesses using Drisya
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, index) => (
-              <Card key={index} className="p-6" data-testid={`testimonial-${index}`}>
-                <div className="flex gap-1 mb-4">
-                  {Array.from({ length: testimonial.rating }).map((_, i) => (
-                    <Star key={i} className="w-5 h-5 fill-primary text-primary" />
-                  ))}
-                </div>
-                <p className="text-muted-foreground mb-6">"{testimonial.content}"</p>
-                <div>
-                  <p className="font-semibold">{testimonial.name}</p>
-                  <p className="text-sm text-muted-foreground">{testimonial.role}</p>
-                </div>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* FAQ Section */}
-      <section className="py-24 bg-muted/50">
-        <div className="max-w-4xl mx-auto px-6">
-          <div className="text-center space-y-4 mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold">Frequently Asked Questions</h2>
-            <p className="text-lg text-muted-foreground">
-              Everything you need to know about Drisya
-            </p>
-          </div>
-
-          <Accordion type="single" collapsible className="space-y-4">
-            {faqs.map((faq, index) => (
-              <AccordionItem key={index} value={`item-${index}`} className="bg-background rounded-lg px-6">
-                <AccordionTrigger className="text-left hover:no-underline" data-testid={`faq-question-${index}`}>
-                  {faq.question}
-                </AccordionTrigger>
-                <AccordionContent className="text-muted-foreground" data-testid={`faq-answer-${index}`}>
-                  {faq.answer}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-24">
-        <div className="max-w-4xl mx-auto px-6 text-center">
-          <Card className="p-12 bg-gradient-to-br from-primary/10 to-primary/5">
-            <TrendingUp className="w-16 h-16 text-primary mx-auto mb-6" />
-            <h2 className="text-3xl lg:text-4xl font-bold mb-4">
-              Ready to Transform Your Product Images?
-            </h2>
-            <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Join hundreds of businesses using Drisya to create professional product photography
-            </p>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.7, duration: 0.8 }}
+          >
             <Link href="/register">
-              <Button size="lg" className="text-lg px-8" data-testid="button-cta-start">
-                Start Your Free Trial
-                <ArrowRight className="ml-2 w-5 h-5" />
+              <Button
+                size="lg"
+                className="text-lg px-10 py-6 rounded-full"
+                data-testid="button-hero-cta"
+              >
+                Start now
+                <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
             </Link>
-          </Card>
-        </div>
+          </motion.div>
+        </motion.div>
+
+        {/* Scroll Indicator */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.2, duration: 0.8 }}
+          className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3"
+        >
+          <span className="text-sm text-muted-foreground">Start scrolling to explore</span>
+          <motion.div
+            animate={{ y: [0, 10, 0] }}
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <ChevronDown className="w-6 h-6 text-muted-foreground" />
+          </motion.div>
+        </motion.div>
+
+        {/* Background Elements */}
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-background -z-10" />
+        <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl -z-10" />
+        <div className="absolute bottom-1/4 left-1/4 w-96 h-96 bg-accent/20 rounded-full blur-3xl -z-10" />
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-border bg-muted/50">
-        <div className="max-w-7xl mx-auto px-6 py-12">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                  <span className="text-primary-foreground font-bold text-lg">D</span>
-                </div>
-                <h3 className="font-bold text-lg">Drisya</h3>
+      {/* Feature Section 1: "Forever Created to Last" */}
+      <ScrollSection className="min-h-screen flex items-center">
+        <div className="max-w-7xl mx-auto px-6 py-24">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <ParallaxText offset={40}>
+              <div className="space-y-6">
+                <p className="text-sm font-semibold text-primary uppercase tracking-wider">
+                  Forever
+                </p>
+                <h2 className="text-5xl md:text-7xl font-bold leading-tight">
+                  <span className="text-foreground/90">created to</span>
+                  <br />
+                  <span className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                    last
+                  </span>
+                </h2>
+                <p className="text-xl text-muted-foreground leading-relaxed">
+                  Professional-grade image processing that preserves every detail.
+                  Our AI-powered enhancement ensures your products look pristine
+                  across all platforms, forever maintaining their quality.
+                </p>
               </div>
-              <p className="text-sm text-muted-foreground">
-                AI-powered image enhancement platform for professional product photography
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">Product</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>Features</li>
-                <li>Pricing</li>
-                <li>Templates</li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">Company</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>About Us</li>
-                <li>Contact</li>
-                <li>Support</li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">Legal</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>Privacy Policy</li>
-                <li>Terms of Service</li>
-              </ul>
-            </div>
+            </ParallaxText>
+
+            <ParallaxText offset={60}>
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                transition={{ duration: 0.3 }}
+                className="relative group"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20 rounded-3xl blur-2xl group-hover:blur-3xl transition-all duration-500" />
+                <img
+                  src={earringsWhiteBg}
+                  alt="Professional product"
+                  className="relative rounded-3xl shadow-2xl w-full"
+                />
+              </motion.div>
+            </ParallaxText>
           </div>
-          <div className="border-t border-border mt-8 pt-8 text-center text-sm text-muted-foreground">
-            <p>© 2025 Drisya. All rights reserved.</p>
+        </div>
+      </ScrollSection>
+
+      {/* Feature Section 2: "Share Your Emotions" */}
+      <ScrollSection className="min-h-screen flex items-center bg-muted/30">
+        <div className="max-w-7xl mx-auto px-6 py-24">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <ParallaxText offset={60}>
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                transition={{ duration: 0.3 }}
+                className="relative group order-2 lg:order-1"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-accent/20 to-primary/20 rounded-3xl blur-2xl group-hover:blur-3xl transition-all duration-500" />
+                <img
+                  src={earringsDarkBg}
+                  alt="Enhanced product"
+                  className="relative rounded-3xl shadow-2xl w-full"
+                />
+              </motion.div>
+            </ParallaxText>
+
+            <ParallaxText offset={40}>
+              <div className="space-y-6 order-1 lg:order-2">
+                <p className="text-sm font-semibold text-primary uppercase tracking-wider">
+                  Emotions
+                </p>
+                <h2 className="text-5xl md:text-7xl font-bold leading-tight">
+                  <span className="text-foreground/90">share your</span>
+                  <br />
+                  <span className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                    vision
+                  </span>
+                </h2>
+                <p className="text-xl text-muted-foreground leading-relaxed">
+                  From minimalist backgrounds to vibrant gradients, our templates
+                  bring your creative vision to life. Transform ordinary product
+                  photos into emotional masterpieces that connect with your audience.
+                </p>
+                <Link href="/register">
+                  <Button size="lg" className="mt-4" data-testid="button-customize">
+                    Customize it
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </Link>
+              </div>
+            </ParallaxText>
+          </div>
+        </div>
+      </ScrollSection>
+
+      {/* Features Grid Section */}
+      <ScrollSection className="py-32">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center mb-20">
+            <h2 className="text-4xl md:text-6xl font-bold mb-6">
+              Powerful Features
+            </h2>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              Everything you need to create stunning product imagery
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[
+              {
+                icon: Sparkles,
+                title: "AI Enhancement",
+                description: "Automatic quality enhancement with advanced algorithms",
+              },
+              {
+                icon: Layers,
+                title: "Background Removal",
+                description: "Professional-grade edge detection and removal",
+              },
+              {
+                icon: ImageIcon,
+                title: "100+ Templates",
+                description: "Extensive library of premium backgrounds",
+              },
+              {
+                icon: Zap,
+                title: "Bulk Processing",
+                description: "Process thousands of images simultaneously",
+              },
+              {
+                icon: ImageIcon,
+                title: "Fast Results",
+                description: "Get enhanced images in minutes",
+              },
+              {
+                icon: Sparkles,
+                title: "Enterprise Ready",
+                description: "Secure, reliable, and scalable",
+              },
+            ].map((feature, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.3 }}
+                transition={{ delay: index * 0.1, duration: 0.6 }}
+                whileHover={{ y: -5 }}
+                className="p-8 rounded-2xl bg-card border border-border hover-elevate active-elevate-2"
+              >
+                <feature.icon className="w-12 h-12 text-primary mb-4" />
+                <h3 className="text-xl font-semibold mb-3">{feature.title}</h3>
+                <p className="text-muted-foreground">{feature.description}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </ScrollSection>
+
+      {/* Final CTA */}
+      <ScrollSection className="py-32 bg-primary/5">
+        <div className="max-w-4xl mx-auto px-6 text-center">
+          <h2 className="text-4xl md:text-6xl font-bold mb-6">
+            Ready to transform your images?
+          </h2>
+          <p className="text-xl text-muted-foreground mb-12">
+            Join thousands of businesses creating professional product imagery
+          </p>
+          <Link href="/register">
+            <Button size="lg" className="text-lg px-12 py-6 rounded-full" data-testid="button-final-cta">
+              Get Started Free
+              <ArrowRight className="w-5 h-5 ml-2" />
+            </Button>
+          </Link>
+        </div>
+      </ScrollSection>
+
+      {/* Footer */}
+      <footer className="border-t border-border py-12">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                <span className="text-primary-foreground font-bold text-lg">D</span>
+              </div>
+              <span className="font-semibold text-lg">Drisya</span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Created with precision. All rights reserved.
+            </p>
           </div>
         </div>
       </footer>
