@@ -409,43 +409,81 @@ export default function Gallery() {
                   )}
                 </div>
               </div>
-              <div className="aspect-square relative">
-                <img
-                  src={image.processedUrl || image.originalUrl}
-                  alt={image.originalName}
-                  className="w-full h-full object-cover"
-                  data-testid={`img-${image.id}`}
-                />
-                {/* Hover overlay with actions */}
-                <div className="absolute inset-0 bg-black/60 invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => handleDownload(image)}
-                    data-testid={`button-download-${image.id}`}
-                    className="no-default-hover-elevate"
-                  >
-                    <Download className="w-5 h-5 text-white" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => handlePreview(image)}
-                    data-testid={`button-preview-${image.id}`}
-                    className="no-default-hover-elevate"
-                  >
-                    <Eye className="w-5 h-5 text-white" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => handleReEdit(image)}
-                    data-testid={`button-reedit-${image.id}`}
-                    className="no-default-hover-elevate"
-                  >
-                    <RefreshCw className="w-5 h-5 text-white" />
-                  </Button>
-                </div>
+              <div className="aspect-square relative bg-muted">
+                {(image.status === 'failed' || image.jobStatus === 'failed') ? (
+                  <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center">
+                    <X className="w-12 h-12 text-destructive mb-2" />
+                    <p className="text-sm text-muted-foreground">Processing Failed</p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-2"
+                      onClick={() => handleReEdit(image)}
+                    >
+                      <RefreshCw className="w-3 h-3 mr-1" />
+                      Retry
+                    </Button>
+                  </div>
+                ) : (image.status === 'processing' || image.jobStatus === 'processing') ? (
+                  <div className="w-full h-full flex flex-col items-center justify-center">
+                    <Loader2 className="w-12 h-12 text-primary animate-spin mb-2" />
+                    <p className="text-sm text-muted-foreground">Processing...</p>
+                  </div>
+                ) : (
+                  <>
+                    <img
+                      src={image.processedUrl || image.originalUrl}
+                      alt={image.originalName}
+                      className="w-full h-full object-cover"
+                      data-testid={`img-${image.id}`}
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        const parent = target.parentElement;
+                        if (parent) {
+                          parent.innerHTML = `
+                            <div class="w-full h-full flex flex-col items-center justify-center">
+                              <svg class="w-12 h-12 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                              <p class="text-sm text-muted-foreground mt-2">Image not found</p>
+                            </div>
+                          `;
+                        }
+                      }}
+                    />
+                    {/* Hover overlay with actions */}
+                    <div className="absolute inset-0 bg-black/60 invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleDownload(image)}
+                        data-testid={`button-download-${image.id}`}
+                        className="no-default-hover-elevate"
+                      >
+                        <Download className="w-5 h-5 text-white" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handlePreview(image)}
+                        data-testid={`button-preview-${image.id}`}
+                        className="no-default-hover-elevate"
+                      >
+                        <Eye className="w-5 h-5 text-white" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleReEdit(image)}
+                        data-testid={`button-reedit-${image.id}`}
+                        className="no-default-hover-elevate"
+                      >
+                        <RefreshCw className="w-5 h-5 text-white" />
+                      </Button>
+                    </div>
+                  </>
+                )}
               </div>
               <CardContent className="p-2">
                 <p className="text-xs truncate" data-testid={`text-name-${image.id}`}>{image.originalName}</p>
@@ -482,12 +520,22 @@ export default function Gallery() {
               {filteredImages.map((image) => (
                 <TableRow key={image.id} data-testid={`row-image-${image.id}`}>
                   <TableCell>
-                    <div className="w-12 h-12 rounded overflow-hidden">
-                      <img
-                        src={image.processedUrl || image.originalUrl}
-                        alt={image.originalName}
-                        className="w-full h-full object-cover"
-                      />
+                    <div className="w-12 h-12 rounded overflow-hidden bg-muted flex items-center justify-center">
+                      {(image.status === 'failed' || image.jobStatus === 'failed') ? (
+                        <X className="w-6 h-6 text-destructive" />
+                      ) : (image.status === 'processing' || image.jobStatus === 'processing') ? (
+                        <Loader2 className="w-6 h-6 text-primary animate-spin" />
+                      ) : (
+                        <img
+                          src={image.processedUrl || image.originalUrl}
+                          alt={image.originalName}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                          }}
+                        />
+                      )}
                     </div>
                   </TableCell>
                   <TableCell className="font-medium">{image.originalName}</TableCell>
