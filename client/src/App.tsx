@@ -29,6 +29,7 @@ import MediaLibrary from "@/pages/MediaLibrary";
 import Help from "@/pages/Help";
 import Showcase3D from "@/pages/Showcase3D";
 import CustomizeTemplate from "@/pages/CustomizeTemplate";
+import ProductViewer from "@/pages/ProductViewer";
 import NotFound from "@/pages/NotFound";
 import NotificationCenter from "@/components/NotificationCenter";
 import KeyboardShortcuts from "@/components/KeyboardShortcuts";
@@ -78,6 +79,7 @@ function AuthenticatedRouter() {
       <Route path="/admin" component={Admin} />
       <Route path="/showcase-3d" component={Showcase3D} />
       <Route path="/customize" component={CustomizeTemplate} />
+      <Route path="/product-viewer" component={ProductViewer} />
       <Route component={NotFound} />
     </Switch>
   );

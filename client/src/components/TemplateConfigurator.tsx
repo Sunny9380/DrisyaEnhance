@@ -10,6 +10,15 @@ import {
   Palette,
   ChevronRight,
   Check,
+  Circle,
+  Square,
+  Hexagon,
+  Triangle,
+  Droplet,
+  Moon,
+  Zap,
+  Lightbulb,
+  Sun as SunIcon,
 } from "lucide-react";
 
 interface TemplateConfig {
@@ -21,23 +30,23 @@ interface TemplateConfig {
 interface ConfigOption {
   id: string;
   name: string;
-  icon: string;
+  icon: React.ComponentType<{ className?: string }>;
   color: string;
 }
 
 const backgroundOptions: ConfigOption[] = [
-  { id: "velvet", name: "Velvet", icon: "🎨", color: "from-purple-500 to-pink-500" },
-  { id: "marble", name: "Marble", icon: "⚪", color: "from-gray-300 to-gray-500" },
-  { id: "minimal", name: "Minimal", icon: "⬜", color: "from-white to-gray-200" },
-  { id: "gradient", name: "Gradient", icon: "🌈", color: "from-blue-400 to-purple-500" },
-  { id: "festive", name: "Festive", icon: "✨", color: "from-red-400 to-yellow-400" },
+  { id: "velvet", name: "Velvet", icon: Droplet, color: "from-purple-500 to-pink-500" },
+  { id: "marble", name: "Marble", icon: Circle, color: "from-gray-300 to-gray-500" },
+  { id: "minimal", name: "Minimal", icon: Square, color: "from-white to-gray-200" },
+  { id: "gradient", name: "Gradient", icon: Layers, color: "from-blue-400 to-purple-500" },
+  { id: "festive", name: "Festive", icon: Sparkles, color: "from-red-400 to-yellow-400" },
 ];
 
 const lightingOptions: ConfigOption[] = [
-  { id: "moody", name: "Moody", icon: "🌙", color: "from-indigo-600 to-purple-600" },
-  { id: "soft-glow", name: "Soft Glow", icon: "💫", color: "from-amber-300 to-orange-400" },
-  { id: "spotlight", name: "Spotlight", icon: "💡", color: "from-yellow-400 to-yellow-600" },
-  { id: "studio", name: "Studio", icon: "☀️", color: "from-blue-300 to-blue-400" },
+  { id: "moody", name: "Moody", icon: Moon, color: "from-indigo-600 to-purple-600" },
+  { id: "soft-glow", name: "Soft Glow", icon: Zap, color: "from-amber-300 to-orange-400" },
+  { id: "spotlight", name: "Spotlight", icon: Lightbulb, color: "from-yellow-400 to-yellow-600" },
+  { id: "studio", name: "Studio", icon: SunIcon, color: "from-blue-300 to-blue-400" },
 ];
 
 const effectOptions = [
@@ -158,38 +167,41 @@ export default function TemplateConfigurator({
             transition={{ duration: 0.3 }}
             className="grid grid-cols-5 gap-4"
           >
-            {backgroundOptions.map((option) => (
-              <motion.button
-                key={option.id}
-                whileHover={{ scale: 1.05, y: -5 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => updateConfig({ background: option.id })}
-                className={`relative p-6 rounded-2xl border-2 transition-all ${
-                  config.background === option.id
-                    ? "border-primary"
-                    : "border-border hover-elevate"
-                }`}
-                data-testid={`option-background-${option.id}`}
-              >
-                <div className="space-y-3">
-                  <div
-                    className={`w-16 h-16 mx-auto rounded-xl bg-gradient-to-br ${option.color} flex items-center justify-center text-3xl`}
-                  >
-                    {option.icon}
+            {backgroundOptions.map((option) => {
+              const IconComponent = option.icon;
+              return (
+                <motion.button
+                  key={option.id}
+                  whileHover={{ scale: 1.05, y: -5 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => updateConfig({ background: option.id })}
+                  className={`relative p-6 rounded-2xl border-2 transition-all ${
+                    config.background === option.id
+                      ? "border-primary"
+                      : "border-border hover-elevate"
+                  }`}
+                  data-testid={`option-background-${option.id}`}
+                >
+                  <div className="space-y-3">
+                    <div
+                      className={`w-16 h-16 mx-auto rounded-xl bg-gradient-to-br ${option.color} flex items-center justify-center`}
+                    >
+                      <IconComponent className="w-8 h-8 text-white" />
+                    </div>
+                    <p className="text-sm font-medium">{option.name}</p>
                   </div>
-                  <p className="text-sm font-medium">{option.name}</p>
-                </div>
-                {config.background === option.id && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className="absolute top-2 right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center"
-                  >
-                    <Check className="w-4 h-4 text-primary-foreground" />
-                  </motion.div>
-                )}
-              </motion.button>
-            ))}
+                  {config.background === option.id && (
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="absolute top-2 right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center"
+                    >
+                      <Check className="w-4 h-4 text-primary-foreground" />
+                    </motion.div>
+                  )}
+                </motion.button>
+              );
+            })}
           </motion.div>
         )}
 
@@ -202,38 +214,41 @@ export default function TemplateConfigurator({
             transition={{ duration: 0.3 }}
             className="grid grid-cols-4 gap-4"
           >
-            {lightingOptions.map((option) => (
-              <motion.button
-                key={option.id}
-                whileHover={{ scale: 1.05, y: -5 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => updateConfig({ lighting: option.id })}
-                className={`relative p-6 rounded-2xl border-2 transition-all ${
-                  config.lighting === option.id
-                    ? "border-primary"
-                    : "border-border hover-elevate"
-                }`}
-                data-testid={`option-lighting-${option.id}`}
-              >
-                <div className="space-y-3">
-                  <div
-                    className={`w-16 h-16 mx-auto rounded-xl bg-gradient-to-br ${option.color} flex items-center justify-center text-3xl`}
-                  >
-                    {option.icon}
+            {lightingOptions.map((option) => {
+              const IconComponent = option.icon;
+              return (
+                <motion.button
+                  key={option.id}
+                  whileHover={{ scale: 1.05, y: -5 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => updateConfig({ lighting: option.id })}
+                  className={`relative p-6 rounded-2xl border-2 transition-all ${
+                    config.lighting === option.id
+                      ? "border-primary"
+                      : "border-border hover-elevate"
+                  }`}
+                  data-testid={`option-lighting-${option.id}`}
+                >
+                  <div className="space-y-3">
+                    <div
+                      className={`w-16 h-16 mx-auto rounded-xl bg-gradient-to-br ${option.color} flex items-center justify-center`}
+                    >
+                      <IconComponent className="w-8 h-8 text-white" />
+                    </div>
+                    <p className="text-sm font-medium">{option.name}</p>
                   </div>
-                  <p className="text-sm font-medium">{option.name}</p>
-                </div>
-                {config.lighting === option.id && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className="absolute top-2 right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center"
-                  >
-                    <Check className="w-4 h-4 text-primary-foreground" />
-                  </motion.div>
-                )}
-              </motion.button>
-            ))}
+                  {config.lighting === option.id && (
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="absolute top-2 right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center"
+                    >
+                      <Check className="w-4 h-4 text-primary-foreground" />
+                    </motion.div>
+                  )}
+                </motion.button>
+              );
+            })}
           </motion.div>
         )}
 

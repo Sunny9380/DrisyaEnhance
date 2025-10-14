@@ -68,7 +68,7 @@ export default function CustomizeTemplate() {
   return (
     <div ref={containerRef} className="min-h-screen bg-background">
       {/* Navigation */}
-      <div className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
+      <div className="sticky top-0 z-[100] border-b border-border bg-background/80 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/templates">
             <Button variant="ghost" size="sm" data-testid="button-back">
@@ -111,7 +111,7 @@ export default function CustomizeTemplate() {
             initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
-            className="sticky top-32"
+            className="sticky top-32 z-10"
           >
             <div className="relative">
               <motion.div
