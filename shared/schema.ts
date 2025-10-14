@@ -205,6 +205,23 @@ export const aiUsageLedger = pgTable("ai_usage_ledger", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// Background Library - 1000+ background images for templates
+export const backgrounds = pgTable("backgrounds", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(), // Display name
+  category: text("category").notNull(), // fabrics, textures, gradients, nature, abstract, marble, velvet, etc.
+  tags: text("tags").array(), // Searchable tags: ["luxury", "dark", "elegant"]
+  imageUrl: text("image_url").notNull(), // Full resolution background URL
+  thumbnailUrl: text("thumbnail_url"), // Preview thumbnail
+  source: text("source").notNull().default("upload"), // unsplash, pexels, upload, ai-generated, premium
+  sourceId: text("source_id"), // External API ID for attribution
+  sourceAuthor: text("source_author"), // Photo credit
+  isPremium: boolean("is_premium").notNull().default(false),
+  isActive: boolean("is_active").notNull().default(true),
+  createdBy: varchar("created_by").references(() => users.id), // Admin who added it
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Zod schemas for validation
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -312,6 +329,11 @@ export const insertAIUsageLedgerSchema = createInsertSchema(aiUsageLedger).omit(
   updatedAt: true,
 });
 
+export const insertBackgroundSchema = createInsertSchema(backgrounds).omit({
+  id: true,
+  createdAt: true,
+});
+
 // TypeScript types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -354,3 +376,6 @@ export type AIEdit = typeof aiEdits.$inferSelect;
 
 export type InsertAIUsageLedger = z.infer<typeof insertAIUsageLedgerSchema>;
 export type AIUsageLedger = typeof aiUsageLedger.$inferSelect;
+
+export type InsertBackground = z.infer<typeof insertBackgroundSchema>;
+export type Background = typeof backgrounds.$inferSelect;
