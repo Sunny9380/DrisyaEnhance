@@ -183,6 +183,7 @@ export const aiEdits = pgTable("ai_edits", {
   imageId: varchar("image_id").references(() => images.id), // Optional link to specific image
   prompt: text("prompt").notNull(), // User's editing instruction
   aiModel: text("ai_model").notNull().default("auto"), // qwen-2509, flux-kontext, auto
+  quality: text("quality").notNull().default("4k"), // 4k, hd, standard - output quality level
   status: text("status").notNull().default("queued"), // queued, processing, completed, failed
   inputImageUrl: text("input_image_url").notNull(), // Original image URL
   outputImageUrl: text("output_image_url"), // AI-edited result URL

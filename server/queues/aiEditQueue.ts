@@ -73,8 +73,8 @@ export class AIEditQueue {
       const absoluteImageUrl = this.getAbsoluteUrl(edit.inputImageUrl);
       console.log(`📸 Input image URL: ${absoluteImageUrl}`);
 
-      // 5. Call HF client with retry logic
-      const result = await this.processWithRetry(absoluteImageUrl, edit.prompt, edit.aiModel);
+      // 5. Call HF client with retry logic, passing quality from edit record
+      const result = await this.processWithRetry(absoluteImageUrl, edit.prompt, edit.aiModel, edit.quality || '4k');
 
       // 6. Upload result to storage
       const outputUrl = await this.uploadResult(result.buffer, editId);
@@ -110,7 +110,8 @@ export class AIEditQueue {
   private async processWithRetry(
     imageUrl: string,
     prompt: string,
-    modelKey: string = "auto"
+    modelKey: string = "auto",
+    quality: string = "4k"
   ): Promise<{ buffer: Buffer; cost: number; usedFallback: boolean }> {
     const rateLimitConfig: RetryConfig = { maxAttempts: 3, currentAttempt: 0 };
     const modelLoadingConfig: RetryConfig = { maxAttempts: 2, currentAttempt: 0 };
@@ -176,10 +177,10 @@ export class AIEditQueue {
       }
     }
 
-    // Fallback to local Python service with 4K quality
-    console.log("🔧 Using local fallback service...");
+    // Fallback to local Python service with user-selected quality
+    console.log(`🔧 Using local fallback service at ${quality} quality...`);
     try {
-      const buffer = await huggingFaceClient.fallbackToLocal(imageUrl, prompt, '4k');
+      const buffer = await huggingFaceClient.fallbackToLocal(imageUrl, prompt, quality);
       if (!buffer) {
         throw new Error("Local fallback returned no buffer");
       }

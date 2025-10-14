@@ -70,35 +70,111 @@ def create_gradient_background(width: int, height: int, color1: str, color2: str
 def create_textured_background(width: int, height: int, description: str) -> Image.Image:
     """
     Create textured background based on description
-    For production: Replace with Stable Diffusion/DALL-E
+    Creates professional dark blue fabric texture like luxury jewelry photography
     """
     # Parse description for colors and style
     description_lower = description.lower()
     
-    # Default colors
-    color1 = "#1a1a2e"  # dark blue
-    color2 = "#0f3460"  # darker blue
+    # Default: Dark blue fabric texture (jewelry photography standard)
+    base_color = "#0a1628"  # Very dark navy blue
     
     # Color detection from description
-    if "blue" in description_lower:
-        color1, color2 = "#1e3a8a", "#3b82f6"
+    if "white" in description_lower or "clean" in description_lower or "light" in description_lower:
+        base_color = "#f8f9fa"
+    elif "blue" in description_lower or "navy" in description_lower:
+        base_color = "#0a1628"  # Dark navy blue
+    elif "black" in description_lower or "dark" in description_lower:
+        base_color = "#0d0d0d"  # Near black
     elif "gold" in description_lower or "luxury" in description_lower:
-        color1, color2 = "#92400e", "#d97706"
-    elif "elegant" in description_lower or "dark" in description_lower:
-        color1, color2 = "#1a1a2e", "#16213e"
-    elif "white" in description_lower or "clean" in description_lower:
-        color1, color2 = "#f8f9fa", "#ffffff"
+        base_color = "#1a0f0a"  # Dark brown
     elif "pink" in description_lower or "rose" in description_lower:
-        color1, color2 = "#ec4899", "#f472b6"
+        base_color = "#2d1a24"  # Dark rose
+    elif "green" in description_lower:
+        base_color = "#0a1a0f"  # Dark green
     
-    # Create gradient background
-    bg = create_gradient_background(width, height, color1, color2)
+    # Create fabric texture using noise patterns
+    bg = create_fabric_texture(width, height, base_color)
     
-    # Add noise/texture for realism
-    enhancer = ImageEnhance.Brightness(bg)
-    bg = enhancer.enhance(0.9)
+    # Add subtle lighting effects for depth
+    if "soft" in description_lower or "lighting" in description_lower:
+        bg = add_soft_lighting(bg)
     
     return bg
+
+
+def create_fabric_texture(width: int, height: int, base_color: str) -> Image.Image:
+    """
+    Create realistic fabric/velvet texture for luxury product photography
+    Optimized with NumPy vectorization for 4K performance
+    """
+    # Parse base color
+    r, g, b = getrgb(base_color)
+    
+    # Create coordinate grids using NumPy (vectorized)
+    x = np.arange(width)
+    y = np.arange(height)
+    X, Y = np.meshgrid(x, y)
+    
+    # Create fabric weave pattern with wave effect (vectorized)
+    wave_effect = (10 * np.sin(X / 30) * np.cos(Y / 30)).astype(np.int32)
+    
+    # Add random noise for fabric texture (vectorized)
+    noise = np.random.randint(-25, 26, size=(height, width), dtype=np.int32)
+    
+    # Combine base color with noise and wave effect
+    combined_effect = noise + wave_effect
+    
+    # Apply to each color channel
+    r_channel = np.clip(r + combined_effect, 0, 255).astype(np.uint8)
+    g_channel = np.clip(g + combined_effect, 0, 255).astype(np.uint8)
+    b_channel = np.clip(b + combined_effect, 0, 255).astype(np.uint8)
+    
+    # Stack channels to create RGB image
+    img_array = np.stack([r_channel, g_channel, b_channel], axis=-1)
+    
+    # Convert NumPy array to PIL Image
+    img = Image.fromarray(img_array, mode='RGB')
+    
+    # Apply blur for fabric softness
+    img = img.filter(ImageFilter.GaussianBlur(radius=4))
+    
+    # Add subtle texture overlay
+    img = img.filter(ImageFilter.DETAIL)
+    
+    return img
+
+
+def add_soft_lighting(image: Image.Image) -> Image.Image:
+    """
+    Add soft lighting effect for professional product photography
+    Optimized with NumPy vectorization for 4K performance
+    """
+    width, height = image.size
+    
+    # Create coordinate grids (vectorized)
+    x = np.arange(width)
+    y = np.arange(height)
+    X, Y = np.meshgrid(x, y)
+    
+    # Calculate center and max distance
+    center_x, center_y = width // 2, height // 2
+    max_distance = ((width ** 2 + height ** 2) ** 0.5) / 2
+    
+    # Calculate distance from center for all pixels (vectorized)
+    distance = np.sqrt((X - center_x) ** 2 + (Y - center_y) ** 2)
+    
+    # Create vignette effect (lighter in center, darker at edges)
+    brightness = (30 * (1 - distance / max_distance)).astype(np.uint8)
+    
+    # Stack to create RGB overlay
+    overlay_array = np.stack([brightness, brightness, brightness], axis=-1)
+    overlay = Image.fromarray(overlay_array, mode='RGB')
+    
+    # Blend with original image
+    overlay = overlay.filter(ImageFilter.GaussianBlur(radius=100))
+    result = Image.blend(image, overlay, alpha=0.3)
+    
+    return result
 
 
 def create_velvet_texture(width: int, height: int, base_color: str) -> Image.Image:
