@@ -1822,6 +1822,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Batch AI edit - process multiple images in parallel
+  app.post("/api/ai-edits/batch", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { images, prompt, aiModel = "auto", quality = "4k" } = req.body;
+
+      if (!Array.isArray(images) || images.length === 0) {
+        return res.status(400).json({ message: "images array is required" });
+      }
+
+      if (!prompt || typeof prompt !== "string") {
+        return res.status(400).json({ message: "prompt is required" });
+      }
+
+      // Check quota for batch
+      const quotaCheck = await storage.checkAIQuota(req.session.userId);
+      if (!quotaCheck.canUse || quotaCheck.remaining < images.length) {
+        return res.status(403).json({ 
+          message: `Insufficient quota. Need ${images.length}, have ${quotaCheck.remaining}`,
+        });
+      }
+
+      // Create AI edit records for each image
+      const editIds: string[] = [];
+      for (const imageUrl of images) {
+        const edit = await storage.createAIEdit({
+          userId: req.session.userId,
+          inputImageUrl: imageUrl,
+          prompt,
+          aiModel,
+          quality,
+          status: "queued",
+        });
+        editIds.push(edit.id);
+      }
+
+      // Start batch processing asynchronously
+      aiEditQueue.processBatch(editIds).then((results) => {
+        console.log(`📊 Batch ${editIds[0]}: ${results.completed}/${results.total} completed, ${results.failed} failed`);
+      }).catch((error) => {
+        console.error(`Failed to process batch:`, error);
+      });
+
+      res.json({
+        success: true,
+        batchId: editIds[0],
+        totalImages: images.length,
+        editIds,
+        status: "queued",
+        message: `Batch of ${images.length} images queued for parallel processing`
+      });
+    } catch (error: any) {
+      console.error("Batch AI edit error:", error);
+      res.status(500).json({ message: error.message || "Failed to create batch edit" });
+    }
+  });
+
   // Get edit status
   app.get("/api/ai-edits/:id", async (req: Request, res: Response) => {
     if (!req.session.userId) {

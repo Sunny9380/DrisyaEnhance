@@ -11,6 +11,44 @@ interface RetryConfig {
 
 export class AIEditQueue {
   private processing = new Set<string>();
+  private maxConcurrent = 20; // Process up to 20 images simultaneously
+
+  /**
+   * Process multiple edits in parallel for high-speed batch processing
+   */
+  async processBatch(editIds: string[]): Promise<{ completed: number; failed: number; total: number }> {
+    const results = {
+      completed: 0,
+      failed: 0,
+      total: editIds.length
+    };
+
+    console.log(`🚀 Starting batch processing of ${editIds.length} images with ${this.maxConcurrent} concurrent workers`);
+
+    // Process in chunks of maxConcurrent
+    for (let i = 0; i < editIds.length; i += this.maxConcurrent) {
+      const chunk = editIds.slice(i, i + this.maxConcurrent);
+      
+      // Process chunk in parallel
+      const chunkResults = await Promise.allSettled(
+        chunk.map(editId => this.processEdit(editId))
+      );
+
+      // Count successes and failures
+      chunkResults.forEach(result => {
+        if (result.status === 'fulfilled') {
+          results.completed++;
+        } else {
+          results.failed++;
+        }
+      });
+
+      console.log(`📊 Batch progress: ${results.completed + results.failed}/${results.total} images processed`);
+    }
+
+    console.log(`✅ Batch complete: ${results.completed} succeeded, ${results.failed} failed out of ${results.total}`);
+    return results;
+  }
 
   /**
    * Convert relative URL to absolute URL for external APIs
