@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Grid as GridIcon, List, Download, Eye, RefreshCw, Plus, Image as ImageIcon, Check, X, Trash } from "lucide-react";
+import { Grid as GridIcon, List, Download, Eye, RefreshCw, Plus, Image as ImageIcon, Check, X, Trash, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -245,24 +245,27 @@ export default function Gallery() {
 
   // Bulk reprocess mutation
   const bulkReprocessMutation = useMutation({
-    mutationFn: async ({ imageIds, templateId }: { imageIds: string[]; templateId: string }) => {
-      // This would typically create a new job with the selected images
-      // For now, we'll show a placeholder implementation
-      console.log("Reprocessing images:", imageIds, "with template:", templateId);
-      return { success: true };
+    mutationFn: async ({ imageIds, templateId, quality }: { imageIds: string[]; templateId: string; quality?: string }) => {
+      return await apiRequest("POST", "/api/gallery/bulk-reprocess", {
+        imageIds,
+        templateId,
+        quality: quality || "standard",
+      });
     },
-    onSuccess: () => {
-      setBulkReprocessDialogOpen(false);
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       toast({
-        title: "Reprocess Started",
-        description: `Processing ${selectedImages.length} images with new template`,
+        title: "Reprocessing Started",
+        description: data.message || `Processing ${selectedImages.length} images with new template`,
       });
       clearSelection();
+      setBulkReprocessDialogOpen(false);
     },
-    onError: () => {
+    onError: (error: any) => {
       toast({
-        title: "Reprocess Failed",
-        description: "Failed to reprocess images",
+        title: "Reprocessing Failed",
+        description: error.message || "Failed to reprocess images",
         variant: "destructive",
       });
     },
@@ -287,7 +290,11 @@ export default function Gallery() {
       });
       return;
     }
-    bulkReprocessMutation.mutate({ imageIds: selectedImages, templateId: reprocessTemplateId });
+    bulkReprocessMutation.mutate({ 
+      imageIds: selectedImages, 
+      templateId: reprocessTemplateId,
+      quality: "standard"
+    });
   };
 
   return (
@@ -641,8 +648,9 @@ export default function Gallery() {
               </Button>
               <Button 
                 onClick={handleBulkReprocess}
-                disabled={bulkReprocessMutation.isPending}
+                disabled={!reprocessTemplateId || bulkReprocessMutation.isPending}
               >
+                {bulkReprocessMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 Reprocess
               </Button>
             </div>

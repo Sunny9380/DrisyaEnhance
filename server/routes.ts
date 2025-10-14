@@ -1293,6 +1293,185 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk reprocess images with new template
+  app.post("/api/gallery/bulk-reprocess", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const { imageIds, templateId, quality } = req.body;
+    
+    if (!imageIds || !Array.isArray(imageIds) || imageIds.length === 0) {
+      return res.status(400).json({ message: "Image IDs required" });
+    }
+    
+    if (!templateId) {
+      return res.status(400).json({ message: "Template ID required" });
+    }
+
+    try {
+      // Get images with ownership verification
+      const images = await storage.getImagesByIds(imageIds, req.session.userId);
+      
+      if (images.length === 0) {
+        return res.status(404).json({ message: "No images found" });
+      }
+
+      // Get template
+      const template = await storage.getTemplate(templateId);
+      if (!template) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+
+      // Calculate coin cost based on quality multiplier (same as upload flow)
+      const qualityMultiplier = {
+        standard: 2,
+        high: 3,
+        ultra: 5,
+      }[quality || "standard"] || 2;
+      
+      const coinCost = images.length * qualityMultiplier;
+
+      // Check user has enough coins
+      const user = await storage.getUser(req.session.userId);
+      if (!user || user.coinBalance < coinCost) {
+        return res.status(403).json({ message: "Insufficient coins" });
+      }
+
+      // Create new processing job for reprocessing
+      const job = await storage.createProcessingJob({
+        userId: req.session.userId,
+        templateId,
+        totalImages: images.length,
+        coinsUsed: coinCost,
+        status: "queued",
+        batchSettings: {
+          quality: quality || "standard",
+          format: "png",
+        },
+      });
+
+      // Create new image records for the job (copy from originals)
+      for (const originalImage of images) {
+        await storage.createImage({
+          jobId: job.id,
+          originalUrl: originalImage.originalUrl, // Reuse original URL
+        });
+      }
+
+      // Deduct coins atomically
+      await storage.addCoinsWithTransaction(req.session.userId, -coinCost, {
+        type: "usage",
+        description: `Reprocessed ${images.length} images with ${template.name} (${quality || "standard"} quality)`,
+        metadata: { jobId: job.id, templateId, quality: quality || "standard", isReprocess: true },
+      });
+
+      // Queue processing job (same as normal upload flow)
+      setTimeout(async () => {
+        try {
+          // Get all images for this job
+          const jobImages = await storage.getJobImages(job.id);
+          
+          // Prepare template settings for Python AI service
+          const templateSettings = {
+            backgroundStyle: template.backgroundStyle || 'gradient',
+            lightingPreset: template.lightingPreset || 'soft-glow',
+            shadowIntensity: template.settings?.shadowIntensity || 0,
+            vignetteStrength: template.settings?.vignetteStrength || 0,
+            colorGrading: template.settings?.colorGrading || 'neutral',
+            gradientColors: template.settings?.gradientColors || ['#0F2027', '#203A43'],
+            diffusionPrompt: template.settings?.diffusionPrompt || '',
+          };
+          
+          // Ensure processed directory exists
+          await fs.mkdir(path.join("uploads", "processed"), { recursive: true });
+
+          // Process images in parallel batches
+          const batchSize = 5;
+          let completedCount = 0;
+          
+          for (let i = 0; i < jobImages.length; i += batchSize) {
+            const batch = jobImages.slice(i, i + batchSize);
+            
+            await Promise.all(
+              batch.map(async (image) => {
+                try {
+                  const originalPath = path.join("uploads", path.basename(image.originalUrl));
+                  
+                  // Process with Python AI service
+                  const processedBase64 = await processImageWithAI(originalPath, templateSettings);
+                  
+                  // Save processed image
+                  const processedFileName = `processed-${path.basename(image.originalUrl)}.png`;
+                  const processedPath = path.join("uploads", "processed", processedFileName);
+                  const processedBuffer = Buffer.from(processedBase64, "base64");
+                  await fs.writeFile(processedPath, processedBuffer);
+                  
+                  const processedUrl = `/uploads/processed/${processedFileName}`;
+                  
+                  // Update image status
+                  await storage.updateImageStatus(image.id, "completed", processedUrl);
+                  completedCount++;
+                  
+                  // Update job progress
+                  await storage.updateProcessingJob(job.id, {
+                    processedImages: completedCount,
+                    status: completedCount === jobImages.length ? "completed" : "processing",
+                  });
+                } catch (error) {
+                  console.error(`Failed to process image ${image.id}:`, error);
+                  await storage.updateImageStatus(image.id, "failed", null);
+                }
+              })
+            );
+          }
+
+          // Create ZIP file of all completed images
+          if (completedCount > 0) {
+            const zipFileName = `reprocessed-job-${job.id}-${Date.now()}.zip`;
+            const zipPath = path.join("uploads", "processed", zipFileName);
+            const archive = archiver("zip", { zlib: { level: 9 } });
+            const output = fsSync.createWriteStream(zipPath);
+            
+            archive.pipe(output);
+            
+            for (const image of jobImages) {
+              if (image.processedUrl) {
+                const imagePath = path.join(process.cwd(), image.processedUrl);
+                try {
+                  await fs.access(imagePath);
+                  archive.file(imagePath, { name: path.basename(image.processedUrl) });
+                } catch (err) {
+                  console.error(`File not found: ${imagePath}`);
+                }
+              }
+            }
+            
+            await archive.finalize();
+            await storage.updateProcessingJob(job.id, {
+              zipUrl: `/uploads/processed/${zipFileName}`,
+              completedAt: new Date(),
+            });
+          }
+
+          console.log(`Bulk reprocess job ${job.id} completed with ${completedCount}/${jobImages.length} images`);
+        } catch (error) {
+          console.error("Bulk reprocess processing error:", error);
+          await storage.updateProcessingJobStatus(job.id, "failed", 0);
+        }
+      }, 2000); // Start processing after 2 seconds
+
+      res.json({
+        jobId: job.id,
+        message: `Reprocessing ${images.length} images with ${template.name}`,
+        coinCost,
+      });
+    } catch (error: any) {
+      console.error("Bulk reprocess error:", error);
+      res.status(500).json({ message: error.message || "Failed to reprocess images" });
+    }
+  });
+
   // ============== Transaction Routes ==============
 
   // Get user transactions
