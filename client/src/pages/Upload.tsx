@@ -148,6 +148,19 @@ export default function Upload() {
     };
   }, [selectedTemplate]);
 
+  // Store file preview URLs to prevent memory leaks
+  const [filePreviewUrls, setFilePreviewUrls] = useState<string[]>([]);
+
+  // Create and cleanup preview URLs when files change
+  useEffect(() => {
+    const urls = files.map(file => URL.createObjectURL(file));
+    setFilePreviewUrls(urls);
+    
+    return () => {
+      urls.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, [files]);
+
   // Fetch AI usage quota
   const { data: aiUsageData } = useQuery<{ used: number; limit: number }>({
     queryKey: ["/api/ai-usage"],
@@ -504,7 +517,7 @@ export default function Upload() {
                           data-testid={`file-item-${index}`}
                         >
                           <img
-                            src={URL.createObjectURL(file)}
+                            src={filePreviewUrls[index]}
                             alt={file.name}
                             className="w-full h-full object-cover"
                           />

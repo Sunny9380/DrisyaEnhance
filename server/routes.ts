@@ -1431,7 +1431,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const zipFileName = `reprocessed-job-${job.id}-${Date.now()}.zip`;
             const zipPath = path.join("uploads", "processed", zipFileName);
             const archive = archiver("zip", { zlib: { level: 9 } });
-            const output = fsSync.createWriteStream(zipPath);
+            const output = createWriteStream(zipPath);
             
             archive.pipe(output);
             

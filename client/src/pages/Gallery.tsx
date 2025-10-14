@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import ImageComparisonSlider from "@/components/ImageComparisonSlider";
 import { Link, useLocation } from "wouter";
@@ -582,6 +582,9 @@ export default function Gallery() {
         <DialogContent className="max-w-4xl" data-testid="dialog-preview">
           <DialogHeader>
             <DialogTitle>{previewImage?.originalName}</DialogTitle>
+            <DialogDescription>
+              Compare original and processed versions of your image
+            </DialogDescription>
           </DialogHeader>
           {previewImage && (
             <div className="space-y-4">
@@ -625,11 +628,11 @@ export default function Gallery() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Reprocess {selectedImages.length} Images</DialogTitle>
+            <DialogDescription>
+              Choose a new template to apply to selected images
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Choose a new template to apply to selected images
-            </p>
             <Select value={reprocessTemplateId} onValueChange={setReprocessTemplateId}>
               <SelectTrigger>
                 <SelectValue placeholder="Select template" />
