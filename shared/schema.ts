@@ -38,6 +38,14 @@ export const templates = pgTable("templates", {
   settings: jsonb("settings"), // Advanced settings: { diffusionPrompt, shadowIntensity, vignetteStrength, etc. }
   isPremium: boolean("is_premium").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
+  // Pricing & Product Details
+  coinCost: integer("coin_cost").notNull().default(1), // Cost per image in coins
+  pricePerImage: integer("price_per_image"), // Price in currency (optional, for display)
+  features: jsonb("features"), // Array of feature objects: [{ title, description, icon }]
+  benefits: jsonb("benefits"), // Array of benefit text items
+  useCases: jsonb("use_cases"), // Array of use case objects: [{ title, description, imageUrl }]
+  whyBuy: text("why_buy"), // Compelling reason to choose this template
+  testimonials: jsonb("testimonials"), // Array: [{ name, role, content, avatarUrl, rating }]
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
