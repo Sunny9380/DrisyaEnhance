@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useLocation } from "wouter";
-import { Crown, Sparkles, Palette, Sun, Star } from "lucide-react";
+import { Crown, Sparkles, Palette, Sun, Star, Info } from "lucide-react";
 import type { Template } from "@shared/schema";
 
 export default function Templates() {
@@ -213,11 +213,23 @@ export default function Templates() {
                   </Badge>
                 </div>
 
-                {/* Category */}
-                <div className="pt-2 border-t">
+                {/* Category & Actions */}
+                <div className="pt-2 border-t flex items-center justify-between gap-2">
                   <span className="text-xs text-muted-foreground uppercase tracking-wide">
                     {template.category}
                   </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setLocation(`/template/${template.id}`);
+                    }}
+                    data-testid={`button-view-details-${template.id}`}
+                  >
+                    <Info className="w-4 h-4 mr-1" />
+                    Details
+                  </Button>
                 </div>
               </div>
             </Card>

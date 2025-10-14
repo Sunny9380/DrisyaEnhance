@@ -72,6 +72,7 @@ export interface IStorage {
   getAllTemplates(): Promise<Template[]>;
   getTemplate(id: string): Promise<Template | undefined>;
   createTemplate(template: InsertTemplate): Promise<Template>;
+  updateTemplate(id: string, data: Partial<InsertTemplate>): Promise<Template>;
 
   // Processing Jobs
   createProcessingJob(job: InsertProcessingJob): Promise<ProcessingJob>;
@@ -356,6 +357,20 @@ export class DbStorage implements IStorage {
 
   async createTemplate(insertTemplate: InsertTemplate): Promise<Template> {
     const result = await db.insert(templates).values(insertTemplate).returning();
+    return result[0];
+  }
+
+  async updateTemplate(id: string, data: Partial<InsertTemplate>): Promise<Template> {
+    const result = await db
+      .update(templates)
+      .set(data)
+      .where(eq(templates.id, id))
+      .returning();
+    
+    if (result.length === 0) {
+      throw new Error("Template not found");
+    }
+    
     return result[0];
   }
 

@@ -30,6 +30,7 @@ import Help from "@/pages/Help";
 import Showcase3D from "@/pages/Showcase3D";
 import CustomizeTemplate from "@/pages/CustomizeTemplate";
 import ProductViewer from "@/pages/ProductViewer";
+import TemplateDetail from "@/pages/TemplateDetail";
 import NotFound from "@/pages/NotFound";
 import NotificationCenter from "@/components/NotificationCenter";
 import KeyboardShortcuts from "@/components/KeyboardShortcuts";
@@ -64,6 +65,7 @@ function AuthenticatedRouter() {
     <Switch>
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/templates" component={Templates} />
+      <Route path="/template/:id" component={TemplateDetail} />
       <Route path="/upload" component={Upload} />
       <Route path="/history" component={History} />
       <Route path="/gallery" component={Gallery} />

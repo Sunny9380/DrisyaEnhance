@@ -844,6 +844,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get single template by ID with all details
+  app.get("/api/templates/:id", async (req: Request, res: Response) => {
+    try {
+      const template = await storage.getTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+      res.json({ template });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to fetch template" });
+    }
+  });
+
+  // Update template (admin only)
+  app.patch("/api/templates/:id", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const user = await storage.getUser(req.session.userId);
+      if (!user || user.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      // Validate and parse template update data
+      const updateSchema = z.object({
+        name: z.string().optional(),
+        category: z.string().optional(),
+        backgroundStyle: z.string().optional(),
+        lightingPreset: z.string().optional(),
+        description: z.string().optional(),
+        thumbnailUrl: z.string().optional(),
+        settings: z.any().optional(),
+        isPremium: z.boolean().optional(),
+        isActive: z.boolean().optional(),
+        coinCost: z.number().int().min(0).optional(),
+        pricePerImage: z.number().int().min(0).optional(),
+        features: z.array(z.object({
+          title: z.string(),
+          description: z.string(),
+          icon: z.string()
+        })).optional(),
+        benefits: z.array(z.string()).optional(),
+        useCases: z.array(z.object({
+          title: z.string(),
+          description: z.string(),
+          imageUrl: z.string().optional()
+        })).optional(),
+        whyBuy: z.string().optional(),
+        testimonials: z.array(z.object({
+          name: z.string(),
+          role: z.string(),
+          content: z.string(),
+          avatarUrl: z.string().optional(),
+          rating: z.number().int().min(1).max(5)
+        })).optional()
+      });
+
+      const validatedData = updateSchema.parse(req.body);
+      const template = await storage.updateTemplate(req.params.id, validatedData);
+      res.json({ template });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Invalid template data", errors: error.errors });
+      }
+      res.status(400).json({ message: error.message || "Failed to update template" });
+    }
+  });
+
   // ============== Usage Quota Routes ==============
 
   // Get user's quota status

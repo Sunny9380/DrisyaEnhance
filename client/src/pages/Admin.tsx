@@ -24,7 +24,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Users, Image, Settings as SettingsIcon, Phone, Coins, Plus, CreditCard, Check, X, TrendingUp, DollarSign } from "lucide-react";
+import { Upload, Users, Image, Settings as SettingsIcon, Phone, Coins, Plus, CreditCard, Check, X, TrendingUp, DollarSign, Edit2, Trash2 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface User {
   id: string;
@@ -892,6 +894,249 @@ function AnalyticsTab() {
   );
 }
 
+function TemplateEditDialog({ template, open, onOpenChange }: { 
+  template: any; 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { toast } = useToast();
+  const [formData, setFormData] = useState({
+    coinCost: template.coinCost?.toString() || "1",
+    pricePerImage: template.pricePerImage?.toString() || "",
+    whyBuy: template.whyBuy || "",
+    features: JSON.stringify(template.features || [], null, 2),
+    benefits: JSON.stringify(template.benefits || [], null, 2),
+    useCases: JSON.stringify(template.useCases || [], null, 2),
+    testimonials: JSON.stringify(template.testimonials || [], null, 2),
+  });
+
+  const updateTemplateMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await apiRequest(`/api/templates/${template.id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
+      toast({ title: "✅ Template updated successfully" });
+      onOpenChange(false);
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: "❌ Failed to update template", 
+        description: error.message, 
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const handleSubmit = () => {
+    try {
+      const data: any = {
+        coinCost: parseInt(formData.coinCost) || 1,
+        whyBuy: formData.whyBuy || null,
+      };
+
+      if (formData.pricePerImage) {
+        data.pricePerImage = parseInt(formData.pricePerImage);
+      }
+
+      // Parse JSON fields
+      try {
+        if (formData.features.trim()) {
+          data.features = JSON.parse(formData.features);
+        }
+      } catch (e) {
+        throw new Error("Invalid Features JSON format");
+      }
+
+      try {
+        if (formData.benefits.trim()) {
+          data.benefits = JSON.parse(formData.benefits);
+        }
+      } catch (e) {
+        throw new Error("Invalid Benefits JSON format");
+      }
+
+      try {
+        if (formData.useCases.trim()) {
+          data.useCases = JSON.parse(formData.useCases);
+        }
+      } catch (e) {
+        throw new Error("Invalid Use Cases JSON format");
+      }
+
+      try {
+        if (formData.testimonials.trim()) {
+          data.testimonials = JSON.parse(formData.testimonials);
+        }
+      } catch (e) {
+        throw new Error("Invalid Testimonials JSON format");
+      }
+
+      updateTemplateMutation.mutate(data);
+    } catch (error: any) {
+      toast({ 
+        title: "❌ Validation Error", 
+        description: error.message, 
+        variant: "destructive" 
+      });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[90vh]">
+        <DialogHeader>
+          <DialogTitle>Edit Template Details: {template.name}</DialogTitle>
+          <DialogDescription>
+            Update pricing, features, benefits, use cases, and testimonials
+          </DialogDescription>
+        </DialogHeader>
+
+        <ScrollArea className="max-h-[calc(90vh-200px)] pr-4">
+          <div className="space-y-6 py-4">
+            {/* Pricing Section */}
+            <div className="space-y-4">
+              <h3 className="font-semibold">Pricing</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="coinCost">Coin Cost per Image</Label>
+                  <Input
+                    id="coinCost"
+                    type="number"
+                    value={formData.coinCost}
+                    onChange={(e) => setFormData({ ...formData, coinCost: e.target.value })}
+                    data-testid="input-coin-cost"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pricePerImage">Price per Image (₹)</Label>
+                  <Input
+                    id="pricePerImage"
+                    type="number"
+                    value={formData.pricePerImage}
+                    onChange={(e) => setFormData({ ...formData, pricePerImage: e.target.value })}
+                    placeholder="Optional"
+                    data-testid="input-price-per-image"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Why Buy Section */}
+            <div className="space-y-2">
+              <Label htmlFor="whyBuy">Why Buy This Template</Label>
+              <Textarea
+                id="whyBuy"
+                value={formData.whyBuy}
+                onChange={(e) => setFormData({ ...formData, whyBuy: e.target.value })}
+                placeholder="Compelling reason to choose this template..."
+                rows={3}
+                data-testid="input-why-buy"
+              />
+            </div>
+
+            {/* Features Section */}
+            <div className="space-y-2">
+              <Label htmlFor="features">
+                Features (JSON Array)
+                <span className="text-xs text-muted-foreground ml-2">
+                  Format: {`[{"title": "...", "description": "...", "icon": "Sparkles"}]`}
+                </span>
+              </Label>
+              <Textarea
+                id="features"
+                value={formData.features}
+                onChange={(e) => setFormData({ ...formData, features: e.target.value })}
+                placeholder='[{"title": "AI Enhancement", "description": "Advanced AI processing", "icon": "Sparkles"}]'
+                rows={6}
+                className="font-mono text-sm"
+                data-testid="input-features"
+              />
+            </div>
+
+            {/* Benefits Section */}
+            <div className="space-y-2">
+              <Label htmlFor="benefits">
+                Benefits (JSON Array)
+                <span className="text-xs text-muted-foreground ml-2">
+                  Format: {`["Benefit 1", "Benefit 2"]`}
+                </span>
+              </Label>
+              <Textarea
+                id="benefits"
+                value={formData.benefits}
+                onChange={(e) => setFormData({ ...formData, benefits: e.target.value })}
+                placeholder='["Professional results", "Time-saving automation", "Consistent quality"]'
+                rows={4}
+                className="font-mono text-sm"
+                data-testid="input-benefits"
+              />
+            </div>
+
+            {/* Use Cases Section */}
+            <div className="space-y-2">
+              <Label htmlFor="useCases">
+                Use Cases (JSON Array)
+                <span className="text-xs text-muted-foreground ml-2">
+                  Format: {`[{"title": "...", "description": "...", "imageUrl": "..."}]`}
+                </span>
+              </Label>
+              <Textarea
+                id="useCases"
+                value={formData.useCases}
+                onChange={(e) => setFormData({ ...formData, useCases: e.target.value })}
+                placeholder='[{"title": "E-commerce", "description": "Perfect for online stores", "imageUrl": ""}]'
+                rows={6}
+                className="font-mono text-sm"
+                data-testid="input-use-cases"
+              />
+            </div>
+
+            {/* Testimonials Section */}
+            <div className="space-y-2">
+              <Label htmlFor="testimonials">
+                Testimonials (JSON Array)
+                <span className="text-xs text-muted-foreground ml-2">
+                  Format: {`[{"name": "...", "role": "...", "content": "...", "avatarUrl": "", "rating": 5}]`}
+                </span>
+              </Label>
+              <Textarea
+                id="testimonials"
+                value={formData.testimonials}
+                onChange={(e) => setFormData({ ...formData, testimonials: e.target.value })}
+                placeholder='[{"name": "John Doe", "role": "Photographer", "content": "Great template!", "avatarUrl": "", "rating": 5}]'
+                rows={6}
+                className="font-mono text-sm"
+                data-testid="input-testimonials"
+              />
+            </div>
+          </div>
+        </ScrollArea>
+
+        <div className="flex gap-2 justify-end pt-4 border-t">
+          <Button 
+            variant="outline" 
+            onClick={() => onOpenChange(false)}
+            data-testid="button-cancel-edit"
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSubmit}
+            disabled={updateTemplateMutation.isPending}
+            data-testid="button-save-template"
+          >
+            {updateTemplateMutation.isPending ? "Saving..." : "Save Changes"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function Admin() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("analytics");
@@ -899,6 +1144,8 @@ export default function Admin() {
   const [coinAmount, setCoinAmount] = useState("");
   const [description, setDescription] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<any | null>(null);
+  const [isTemplateEditOpen, setIsTemplateEditOpen] = useState(false);
 
   // Fetch all users
   const { data: usersData, isLoading } = useQuery<{ users: User[] }>({
@@ -1200,10 +1447,20 @@ export default function Admin() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
-                          <Button variant="ghost" size="sm" data-testid={`button-edit-template-${template.id}`}>
-                            Edit
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => {
+                              setEditingTemplate(template);
+                              setIsTemplateEditOpen(true);
+                            }}
+                            data-testid={`button-edit-template-${template.id}`}
+                          >
+                            <Edit2 className="w-4 h-4 mr-1" />
+                            Edit Details
                           </Button>
                           <Button variant="ghost" size="sm" data-testid={`button-delete-template-${template.id}`}>
+                            <Trash2 className="w-4 h-4 mr-1" />
                             Delete
                           </Button>
                         </div>
@@ -1214,6 +1471,18 @@ export default function Admin() {
               </TableBody>
             </Table>
           </Card>
+
+          {/* Template Edit Dialog */}
+          {editingTemplate && (
+            <TemplateEditDialog
+              template={editingTemplate}
+              open={isTemplateEditOpen}
+              onOpenChange={(open) => {
+                setIsTemplateEditOpen(open);
+                if (!open) setEditingTemplate(null);
+              }}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-4">
