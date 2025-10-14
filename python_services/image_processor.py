@@ -472,6 +472,65 @@ def batch_process():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@app.route('/ai-edit', methods=['POST'])
+def ai_edit():
+    """
+    AI-powered image editing with custom prompt
+    Fallback endpoint when HuggingFace API is unavailable
+    """
+    try:
+        import requests
+        from urllib.parse import urlparse
+        
+        data = request.json
+        image_url = data.get('image_url')
+        prompt = data.get('prompt', '')
+        
+        if not image_url:
+            return jsonify({"success": False, "error": "image_url is required"}), 400
+        
+        # Fetch image from URL
+        if image_url.startswith('http'):
+            response = requests.get(image_url)
+            image = Image.open(io.BytesIO(response.content))
+        else:
+            # Local file path
+            image = Image.open(image_url)
+        
+        # Ensure image is 1080x1080
+        image = image.convert('RGB')
+        image = ImageOps.fit(image, (1080, 1080), Image.Resampling.LANCZOS)
+        
+        # Parse prompt to create background based on description
+        # This is a simple fallback - in production, use AI models
+        background = create_textured_background(1080, 1080, prompt)
+        
+        # Remove background from original image (simple method)
+        image_rgba = image.convert('RGBA')
+        image_no_bg = remove_background_simple(image_rgba)
+        
+        # Composite onto new background
+        result = composite_image(image_no_bg, background)
+        
+        # Apply post-processing
+        result = apply_post_processing(result)
+        
+        # Return as PNG bytes
+        buffer = io.BytesIO()
+        result.save(buffer, format='PNG')
+        buffer.seek(0)
+        
+        return send_file(
+            buffer,
+            mimetype='image/png',
+            as_attachment=False
+        )
+        
+    except Exception as e:
+        print(f"AI edit error: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PYTHON_SERVICE_PORT', 5001))
     app.run(host='0.0.0.0', port=port, debug=True)
