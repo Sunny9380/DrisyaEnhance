@@ -13,6 +13,26 @@ export class AIEditQueue {
   private processing = new Set<string>();
 
   /**
+   * Convert relative URL to absolute URL for external APIs
+   */
+  private getAbsoluteUrl(relativeUrl: string): string {
+    // If already absolute, return as-is
+    if (relativeUrl.startsWith('http://') || relativeUrl.startsWith('https://')) {
+      return relativeUrl;
+    }
+
+    // Get base URL from environment or use localhost for development
+    const baseUrl = process.env.REPL_SLUG 
+      ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
+      : `http://localhost:${process.env.PORT || 5000}`;
+
+    // Ensure relative URL starts with /
+    const url = relativeUrl.startsWith('/') ? relativeUrl : `/${relativeUrl}`;
+    
+    return `${baseUrl}${url}`;
+  }
+
+  /**
    * Process an AI edit request with full error handling and retries
    */
   async processEdit(editId: string): Promise<void> {
@@ -49,13 +69,17 @@ export class AIEditQueue {
         },
       });
 
-      // 4. Call HF client with retry logic
-      const result = await this.processWithRetry(edit.inputImageUrl, edit.prompt, edit.aiModel);
+      // 4. Convert relative URL to absolute for external APIs
+      const absoluteImageUrl = this.getAbsoluteUrl(edit.inputImageUrl);
+      console.log(`📸 Input image URL: ${absoluteImageUrl}`);
 
-      // 5. Upload result to storage
+      // 5. Call HF client with retry logic
+      const result = await this.processWithRetry(absoluteImageUrl, edit.prompt, edit.aiModel);
+
+      // 6. Upload result to storage
       const outputUrl = await this.uploadResult(result.buffer, editId);
 
-      // 6. Update edit record with success
+      // 7. Update edit record with success
       await storage.updateAIEdit(editId, {
         status: "completed",
         outputImageUrl: outputUrl,
@@ -67,7 +91,7 @@ export class AIEditQueue {
         },
       });
 
-      // 7. Increment AI usage counter
+      // 8. Increment AI usage counter
       const isFree = result.cost === 0;
       await storage.incrementAIUsage(edit.userId, isFree, result.cost);
 
