@@ -54,9 +54,20 @@ app.use(
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       secure: process.env.NODE_ENV === "production",
       httpOnly: true,
+      sameSite: 'lax',
     },
   })
 );
+
+// Session debugging middleware
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api') && !req.path.startsWith('/api/auth')) {
+    if (!req.session || !(req.session as any).userId) {
+      log(`⚠️ No session for ${req.method} ${req.path} - Session ID: ${req.sessionID || 'none'}`);
+    }
+  }
+  next();
+});
 
 app.use((req, res, next) => {
   const start = Date.now();

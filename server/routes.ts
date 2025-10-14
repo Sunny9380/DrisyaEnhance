@@ -179,6 +179,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Set session
       req.session.userId = user.id;
 
+      // Explicitly save session to PostgreSQL to ensure persistence
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
       // Send welcome email (non-blocking)
       const updatedUser = await storage.getUser(user.id);
       if (updatedUser && shouldSendEmail(updatedUser, "welcome")) {
@@ -211,6 +219,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       req.session.userId = user.id;
+
+      // Explicitly save session to PostgreSQL to ensure persistence
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
 
       // Log login for security audit (SaaS requirement)
       await logAudit(
