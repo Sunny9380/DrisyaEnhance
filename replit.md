@@ -23,8 +23,9 @@ Preferred communication style: Simple, everyday language.
 **API:** RESTful API with route registration, logging, and error handling.
 **Authentication:** Session-based authentication using PostgreSQL.
 **File Structure:** Modular, separating application entry, routes, storage, and database configuration.
-**AI Image Processing:** Python Flask microservice (Port 5001) handles AI-powered background removal, various background styles, lighting presets, advanced effects (shadows, vignette, color grading), and post-processing (auto-contrast, tone balance, sharpness, 1080x1080px output). Integrates via Base64 image encoding with retry logic to handle Replit proxy issues.
-**Custom AI Image Editing:** Integrated Hugging Face Inference API client (Qwen-Image-Edit-2509, FLUX.1-Kontext-dev, and auto-mode) for prompt-based image transformations. Features an async processing queue with quota enforcement (1000 free API calls/month) and fallback to local Python service.
+**AI Image Processing:** Python Flask microservice (Port 5001) handles AI-powered background removal, various background styles, lighting presets, advanced effects (shadows, vignette, color grading), and post-processing (auto-contrast, tone balance, sharpness). Supports multiple quality levels: 4K (2160x2160), HD (1920x1920), Standard (1080x1080). Integrates via Base64 image encoding with retry logic to handle Replit proxy issues.
+**Custom AI Image Editing:** Integrated Hugging Face Inference API client (Qwen-Image-Edit-2509, FLUX.1-Kontext-dev, and auto-mode) for prompt-based image transformations. Features an async processing queue with quota enforcement (1000 free API calls/month) and fallback to local Python service with 4K quality support.
+**Professional Backgrounds:** NumPy-optimized fabric texture generation creates luxury jewelry photography backgrounds (dark blue velvet, fabric textures) with soft lighting effects. Vectorized processing handles 4K images in milliseconds for production throughput.
 
 ### Database
 
