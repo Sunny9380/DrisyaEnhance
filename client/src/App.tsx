@@ -27,6 +27,7 @@ import Integrations from "@/pages/Integrations";
 import APIAccess from "@/pages/APIAccess";
 import MediaLibrary from "@/pages/MediaLibrary";
 import Help from "@/pages/Help";
+import Showcase3D from "@/pages/Showcase3D";
 import NotFound from "@/pages/NotFound";
 import NotificationCenter from "@/components/NotificationCenter";
 import KeyboardShortcuts from "@/components/KeyboardShortcuts";
@@ -74,6 +75,7 @@ function AuthenticatedRouter() {
       <Route path="/integrations" component={Integrations} />
       <Route path="/api" component={APIAccess} />
       <Route path="/admin" component={Admin} />
+      <Route path="/showcase-3d" component={Showcase3D} />
       <Route component={NotFound} />
     </Switch>
   );
