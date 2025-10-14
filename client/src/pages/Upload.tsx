@@ -374,10 +374,34 @@ export default function Upload() {
       // First, upload the image to get a URL
       const uploadResult = await uploadSingleImageMutation.mutateAsync(files[0]);
       
+      // Enhance prompt with selected template background if available
+      let enhancedPrompt = aiPrompt;
+      if (selectedTemplate?.settings) {
+        const templateBg = (selectedTemplate.settings as any).background;
+        if (templateBg) {
+          // Map template backgrounds to descriptive prompts
+          const bgDescriptions: Record<string, string> = {
+            'rose-gold': 'rose gold metallic gradient background with warm lighting',
+            'dark-fabric': 'dark blue fabric background with soft lighting',
+            'white-studio': 'clean white studio background with professional lighting',
+            'blue-gradient': 'elegant blue gradient background',
+            'wooden-table': 'natural wooden table surface background',
+            'marble': 'luxurious marble surface background',
+            'black-velvet': 'black velvet background with dramatic lighting',
+            'soft-pink': 'soft pink background with gentle lighting',
+          };
+          
+          const bgDesc = bgDescriptions[templateBg];
+          if (bgDesc) {
+            enhancedPrompt = `${aiPrompt}, ${bgDesc}`;
+          }
+        }
+      }
+      
       // Then trigger the AI edit with the uploaded image URL
       aiEditMutation.mutate({
         inputImageUrl: uploadResult.imageUrl,
-        prompt: aiPrompt,
+        prompt: enhancedPrompt,
         aiModel: aiModel,
       });
     } catch (error: any) {
@@ -817,6 +841,12 @@ export default function Upload() {
                       data-testid="input-ai-prompt"
                       rows={4}
                     />
+                    {selectedTemplate && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" />
+                        Template background will be auto-applied: <span className="font-medium">{selectedTemplate.name}</span>
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-2">

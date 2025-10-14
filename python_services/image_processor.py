@@ -79,7 +79,9 @@ def create_textured_background(width: int, height: int, description: str) -> Ima
     base_color = "#0a1628"  # Very dark navy blue
     
     # Color detection from description
-    if "white" in description_lower or "clean" in description_lower or "light" in description_lower:
+    if "rose gold" in description_lower or "rosegold" in description_lower:
+        base_color = "#b76e79"  # Rose gold
+    elif "white" in description_lower or "clean" in description_lower or "light" in description_lower:
         base_color = "#f8f9fa"
     elif "blue" in description_lower or "navy" in description_lower:
         base_color = "#0a1628"  # Dark navy blue
