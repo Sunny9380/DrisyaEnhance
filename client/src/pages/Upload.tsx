@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import UploadDropzone from "@/components/UploadDropzone";
 import TemplateGallery from "@/components/TemplateGallery";
 import BatchEditPanel from "@/components/BatchEditPanel";
+import { TemplatePreview } from "@/components/TemplatePreview";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -121,6 +122,31 @@ export default function Upload() {
 
   const templates = templatesData?.templates || [];
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
+
+  // Create preview URL for the first uploaded image
+  const firstImagePreviewUrl = useMemo(() => {
+    if (files.length === 0) return null;
+    return URL.createObjectURL(files[0]);
+  }, [files]);
+
+  // Cleanup preview URL on unmount or when files change
+  useEffect(() => {
+    return () => {
+      if (firstImagePreviewUrl) {
+        URL.revokeObjectURL(firstImagePreviewUrl);
+      }
+    };
+  }, [firstImagePreviewUrl]);
+
+  // Memoize template style to prevent unnecessary re-renders
+  const templateStyle = useMemo(() => {
+    if (!selectedTemplate) return null;
+    return {
+      backgroundStyle: selectedTemplate.backgroundStyle || "gradient",
+      gradientColors: (selectedTemplate.settings as any)?.gradientColors,
+      lightingPreset: selectedTemplate.lightingPreset || "soft-glow",
+    };
+  }, [selectedTemplate]);
 
   // Fetch AI usage quota
   const { data: aiUsageData } = useQuery<{ used: number; limit: number }>({
@@ -570,6 +596,48 @@ export default function Upload() {
                     selectedTemplateId={selectedTemplateId}
                     onTemplateSelect={handleTemplateSelect}
                   />
+
+                  {/* Template Preview */}
+                  {files.length > 0 && selectedTemplate && (
+                    <>
+                      <Separator />
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <TemplatePreview
+                          imageUrl={firstImagePreviewUrl}
+                          templateStyle={templateStyle}
+                        />
+                        <div className="space-y-4">
+                          <div>
+                            <h3 className="text-lg font-semibold mb-2">Preview Information</h3>
+                            <div className="space-y-2 text-sm">
+                              <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground">Template:</span>
+                                <span className="font-medium">{selectedTemplate.name}</span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground">Background:</span>
+                                <span className="font-medium capitalize">{selectedTemplate.backgroundStyle}</span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground">Lighting:</span>
+                                <span className="font-medium capitalize">{selectedTemplate.lightingPreset?.replace('-', ' ')}</span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground">Preview Image:</span>
+                                <span className="font-medium">{files[0].name}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <Alert>
+                            <Info className="w-4 h-4" />
+                            <AlertDescription>
+                              This is an instant client-side preview. Actual processed images may have enhanced quality and additional effects applied.
+                            </AlertDescription>
+                          </Alert>
+                        </div>
+                      </div>
+                    </>
+                  )}
 
                   {selectedTemplate && (
                     <>
