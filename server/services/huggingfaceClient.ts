@@ -29,6 +29,25 @@ export class HuggingFaceClient {
   }
 
   /**
+   * Convert absolute Replit URL to localhost to avoid helium proxy
+   */
+  private getLocalUrl(url: string): string {
+    // If it's already a localhost URL, return as-is
+    if (url.startsWith('http://localhost') || url.startsWith('http://127.0.0.1')) {
+      return url;
+    }
+
+    // If it's a Replit URL pointing to our own app, convert to localhost
+    if (url.includes('.repl.co/uploads/') || url.includes('/uploads/')) {
+      const path = url.substring(url.indexOf('/uploads/'));
+      return `http://localhost:${process.env.PORT || 5000}${path}`;
+    }
+
+    // External URL - return as-is
+    return url;
+  }
+
+  /**
    * Edit an image using AI model with custom prompt
    */
   async editImage(
@@ -42,8 +61,12 @@ export class HuggingFaceClient {
       console.log(`🤖 Calling HuggingFace model: ${modelName}`);
       console.log(`📝 Prompt: ${prompt}`);
 
+      // Convert to local URL to avoid Replit proxy issues
+      const localUrl = this.getLocalUrl(imageUrl);
+      console.log(`📥 Fetching image from: ${localUrl}`);
+
       // Fetch the image
-      const imageResponse = await fetch(imageUrl);
+      const imageResponse = await fetch(localUrl);
       const imageArrayBuffer = await imageResponse.arrayBuffer();
       const imageBuffer = Buffer.from(imageArrayBuffer);
 
