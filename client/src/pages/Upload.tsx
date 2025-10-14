@@ -842,10 +842,15 @@ export default function Upload() {
                       rows={4}
                     />
                     {selectedTemplate && (
-                      <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Sparkles className="w-3 h-3" />
-                        Template background will be auto-applied: <span className="font-medium">{selectedTemplate.name}</span>
-                      </p>
+                      <div className="p-3 bg-primary/10 rounded-lg border border-primary/20">
+                        <p className="text-sm font-medium text-primary flex items-center gap-1">
+                          <Sparkles className="w-4 h-4" />
+                          Using "{selectedTemplate.name}" template for all images
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          All AI transformations will have the same {selectedTemplate.name} background style
+                        </p>
+                      </div>
                     )}
                   </div>
 
@@ -893,11 +898,27 @@ export default function Upload() {
                 <>
                   <Separator />
                   <div className="space-y-4">
-                    <div>
-                      <h3 className="text-lg font-semibold">Your AI Edit History</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Recent AI transformations with before/after preview
-                      </p>
+                    <div className="space-y-3">
+                      <div>
+                        <h3 className="text-lg font-semibold">Your AI Edit History</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Recent AI transformations with before/after preview
+                        </p>
+                      </div>
+                      
+                      {selectedTemplate && (
+                        <div className="flex items-center gap-2 p-3 bg-primary/10 rounded-lg border border-primary/20">
+                          <Sparkles className="w-4 h-4 text-primary" />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-primary">
+                              Active Template: {selectedTemplate.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              All AI transformations will use this template's background style
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                     
                     {editsLoading ? (
