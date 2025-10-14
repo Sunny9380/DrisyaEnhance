@@ -361,6 +361,16 @@ export default function Upload() {
       return;
     }
 
+    // Check quota BEFORE starting uploads for batch operations
+    if (files.length > 1 && quotaRemaining < files.length) {
+      toast({
+        title: "❌ Insufficient quota",
+        description: `Need ${files.length} edits, but only ${quotaRemaining} remaining. Please upgrade or process fewer images.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (quotaRemaining <= 0) {
       toast({
         title: "❌ Quota exceeded",
@@ -371,15 +381,11 @@ export default function Upload() {
     }
 
     try {
-      // First, upload the image to get a URL
-      const uploadResult = await uploadSingleImageMutation.mutateAsync(files[0]);
-      
       // Enhance prompt with selected template background if available
       let enhancedPrompt = aiPrompt;
       if (selectedTemplate?.settings) {
         const templateBg = (selectedTemplate.settings as any).background;
         if (templateBg) {
-          // Map template backgrounds to descriptive prompts
           const bgDescriptions: Record<string, string> = {
             'rose-gold': 'rose gold metallic gradient background with warm lighting',
             'dark-fabric': 'dark blue fabric background with soft lighting',
@@ -397,17 +403,84 @@ export default function Upload() {
           }
         }
       }
-      
-      // Then trigger the AI edit with the uploaded image URL
-      aiEditMutation.mutate({
-        inputImageUrl: uploadResult.imageUrl,
-        prompt: enhancedPrompt,
-        aiModel: aiModel,
-      });
+
+      // Check if batch processing (multiple files)
+      if (files.length > 1) {
+        // Upload images in chunks with resilient error handling
+        const UPLOAD_CHUNK_SIZE = 10; // Upload 10 images at a time
+        const imageUrls: string[] = [];
+        const failedUploads: string[] = [];
+        
+        toast({
+          title: "📤 Uploading images...",
+          description: `Uploading ${files.length} images in batches of ${UPLOAD_CHUNK_SIZE}`,
+        });
+
+        for (let i = 0; i < files.length; i += UPLOAD_CHUNK_SIZE) {
+          const chunk = files.slice(i, i + UPLOAD_CHUNK_SIZE);
+          
+          // Use Promise.allSettled to continue even if some uploads fail
+          const chunkResults = await Promise.allSettled(
+            chunk.map(file => uploadSingleImageMutation.mutateAsync(file))
+          );
+          
+          chunkResults.forEach((result, idx) => {
+            if (result.status === 'fulfilled') {
+              imageUrls.push(result.value.imageUrl);
+            } else {
+              failedUploads.push(chunk[idx].name);
+              console.error(`Failed to upload ${chunk[idx].name}:`, result.reason);
+            }
+          });
+          
+          console.log(`Uploaded ${imageUrls.length}/${files.length} images (${failedUploads.length} failed)`);
+        }
+
+        // Report partial upload failures
+        if (failedUploads.length > 0) {
+          toast({
+            title: "⚠️ Some uploads failed",
+            description: `${failedUploads.length} images failed to upload. Proceeding with ${imageUrls.length} successful uploads.`,
+            variant: "destructive",
+          });
+        }
+
+        // Only proceed if we have at least one successful upload
+        if (imageUrls.length === 0) {
+          throw new Error("All uploads failed. Please try again.");
+        }
+
+        // Then trigger batch AI edit
+        const res = await apiRequest("POST", "/api/ai-edits/batch", {
+          images: imageUrls,
+          prompt: enhancedPrompt,
+          aiModel: aiModel,
+          quality: quality,
+        });
+
+        const data = await res.json();
+        toast({
+          title: "🚀 Batch processing started!",
+          description: `Processing ${files.length} images in parallel (20 concurrent workers)`,
+        });
+
+        // Refresh edits list
+        queryClient.invalidateQueries({ queryKey: ['/api/ai-edits'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/ai-usage'] });
+      } else {
+        // Single image processing
+        const uploadResult = await uploadSingleImageMutation.mutateAsync(files[0]);
+        
+        aiEditMutation.mutate({
+          inputImageUrl: uploadResult.imageUrl,
+          prompt: enhancedPrompt,
+          aiModel: aiModel,
+        });
+      }
     } catch (error: any) {
       toast({
-        title: "❌ Upload failed",
-        description: error.message || "Failed to upload image for AI transform",
+        title: "❌ Processing failed",
+        description: error.message || "Failed to start AI transformation",
         variant: "destructive",
       });
     }
@@ -824,12 +897,18 @@ export default function Upload() {
                     <Sparkles className="w-5 h-5 text-primary" />
                     <h3 className="text-lg font-semibold">AI Image Editing (Beta)</h3>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    Write a prompt to transform your images with AI
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                      Write a prompt to transform your images with AI
+                    </p>
+                    <Badge variant="secondary" className="gap-1">
+                      <Zap className="w-3 h-3" />
+                      Batch Mode: {files.length} {files.length === 1 ? 'image' : 'images'}
+                    </Badge>
+                  </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="ai-prompt">Transformation Prompt</Label>
+                    <Label htmlFor="ai-prompt">Transformation Prompt (applies to all images)</Label>
                     <Textarea
                       id="ai-prompt"
                       placeholder="Examples:
@@ -883,13 +962,28 @@ export default function Upload() {
 
                   <Button
                     onClick={handleAIEdit}
-                    disabled={!aiPrompt.trim() || aiEditMutation.isPending || quotaRemaining <= 0}
+                    disabled={!aiPrompt.trim() || aiEditMutation.isPending || quotaRemaining <= 0 || files.length === 0}
                     data-testid="button-ai-edit"
                     className="w-full"
                   >
-                    <Sparkles className="w-4 h-4 mr-2" />
-                    {aiEditMutation.isPending ? "Transforming..." : "Transform with AI"}
+                    {files.length > 1 ? (
+                      <>
+                        <Zap className="w-4 h-4 mr-2" />
+                        {aiEditMutation.isPending ? `Processing ${files.length} images...` : `Transform ${files.length} Images (Batch Mode)`}
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        {aiEditMutation.isPending ? "Transforming..." : "Transform with AI"}
+                      </>
+                    )}
                   </Button>
+                  
+                  {files.length > 1 && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      ⚡ Fast batch processing: 20 images processed simultaneously
+                    </p>
+                  )}
                 </div>
               )}
 

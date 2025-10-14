@@ -1839,6 +1839,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "prompt is required" });
       }
 
+      // Limit batch size to prevent resource exhaustion
+      const MAX_BATCH_SIZE = 1000;
+      if (images.length > MAX_BATCH_SIZE) {
+        return res.status(400).json({ 
+          message: `Batch size too large. Maximum ${MAX_BATCH_SIZE} images allowed per batch.`
+        });
+      }
+
       // Check quota for batch
       const quotaCheck = await storage.checkAIQuota(req.session.userId);
       if (!quotaCheck.canUse || quotaCheck.remaining < images.length) {
