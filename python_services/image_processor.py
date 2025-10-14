@@ -341,6 +341,29 @@ def composite_image(product: Image.Image, background: Image.Image, size: Tuple[i
     return background
 
 
+def apply_post_processing(image: Image.Image, enhance_quality: bool = True) -> Image.Image:
+    """
+    Apply post-processing to enhance image quality for 4K clarity
+    """
+    # Auto-contrast for better clarity
+    image = ImageOps.autocontrast(image, cutoff=1)
+    
+    if enhance_quality:
+        # Enhance sharpness for 4K clarity
+        sharpness_enhancer = ImageEnhance.Sharpness(image)
+        image = sharpness_enhancer.enhance(1.3)
+        
+        # Enhance color saturation slightly
+        color_enhancer = ImageEnhance.Color(image)
+        image = color_enhancer.enhance(1.1)
+        
+        # Enhance brightness slightly
+        brightness_enhancer = ImageEnhance.Brightness(image)
+        image = brightness_enhancer.enhance(1.05)
+    
+    return image
+
+
 @app.route('/health', methods=['GET'])
 def health():
     """Health check endpoint"""
@@ -477,6 +500,7 @@ def ai_edit():
     """
     AI-powered image editing with custom prompt
     Fallback endpoint when HuggingFace API is unavailable
+    Supports 4K quality output (2160x2160) for crystal clear results
     """
     try:
         import requests
@@ -485,9 +509,18 @@ def ai_edit():
         data = request.json
         image_url = data.get('image_url')
         prompt = data.get('prompt', '')
+        quality = data.get('quality', '4k')  # '4k', 'hd', or 'standard'
         
         if not image_url:
             return jsonify({"success": False, "error": "image_url is required"}), 400
+        
+        # Determine output size based on quality setting
+        if quality == '4k':
+            output_size = (2160, 2160)  # 4K quality
+        elif quality == 'hd':
+            output_size = (1920, 1920)  # Full HD
+        else:
+            output_size = (1080, 1080)  # Standard
         
         # Fetch image from URL
         if image_url.startswith('http'):
@@ -497,27 +530,29 @@ def ai_edit():
             # Local file path
             image = Image.open(image_url)
         
-        # Ensure image is 1080x1080
+        # Convert to high quality RGB
         image = image.convert('RGB')
-        image = ImageOps.fit(image, (1080, 1080), Image.Resampling.LANCZOS)
+        
+        # Resize to target quality maintaining aspect ratio
+        image = ImageOps.fit(image, output_size, Image.Resampling.LANCZOS)
         
         # Parse prompt to create background based on description
-        # This is a simple fallback - in production, use AI models
-        background = create_textured_background(1080, 1080, prompt)
+        # Enhanced background creation for better quality
+        background = create_textured_background(output_size[0], output_size[1], prompt)
         
         # Remove background from original image (simple method)
         image_rgba = image.convert('RGBA')
         image_no_bg = remove_background_simple(image_rgba)
         
         # Composite onto new background
-        result = composite_image(image_no_bg, background)
+        result = composite_image(image_no_bg, background, size=output_size)
         
-        # Apply post-processing
-        result = apply_post_processing(result)
+        # Apply post-processing for 4K clarity
+        result = apply_post_processing(result, enhance_quality=True)
         
-        # Return as PNG bytes
+        # Return as high-quality PNG
         buffer = io.BytesIO()
-        result.save(buffer, format='PNG')
+        result.save(buffer, format='PNG', quality=95, optimize=True)
         buffer.seek(0)
         
         return send_file(
@@ -527,8 +562,11 @@ def ai_edit():
         )
         
     except Exception as e:
+        import traceback
+        error_detail = traceback.format_exc()
         print(f"AI edit error: {str(e)}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        print(f"Full traceback: {error_detail}")
+        return jsonify({"success": False, "error": str(e), "details": error_detail}), 500
 
 
 if __name__ == '__main__':

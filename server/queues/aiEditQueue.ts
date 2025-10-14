@@ -176,10 +176,10 @@ export class AIEditQueue {
       }
     }
 
-    // Fallback to local Python service
+    // Fallback to local Python service with 4K quality
     console.log("🔧 Using local fallback service...");
     try {
-      const buffer = await huggingFaceClient.fallbackToLocal(imageUrl, prompt);
+      const buffer = await huggingFaceClient.fallbackToLocal(imageUrl, prompt, '4k');
       if (!buffer) {
         throw new Error("Local fallback returned no buffer");
       }

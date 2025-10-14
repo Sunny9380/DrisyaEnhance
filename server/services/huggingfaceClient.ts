@@ -134,28 +134,34 @@ export class HuggingFaceClient {
   /**
    * Fallback to local Python service when HF API fails
    */
-  async fallbackToLocal(imageUrl: string, prompt: string): Promise<Buffer | null> {
+  async fallbackToLocal(imageUrl: string, prompt: string, quality: string = '4k'): Promise<Buffer | null> {
     console.log("🔧 Falling back to local Python service...");
     
     try {
+      // Convert Replit URL to localhost to bypass helium proxy
+      const localUrl = this.getLocalUrl(imageUrl);
+      
       // Call local Python service (existing Drisya service on port 5001)
       const response = await fetch("http://127.0.0.1:5001/ai-edit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          image_url: imageUrl,
+          image_url: localUrl,
           prompt: prompt,
+          quality: quality, // '4k', 'hd', or 'standard'
           model: "local",
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`Local service error: ${response.status}`);
+        const errorText = await response.text();
+        console.error(`❌ Python service error: ${errorText}`);
+        throw new Error(`Local service error: ${response.status} - ${errorText}`);
       }
 
       const resultArrayBuffer = await response.arrayBuffer();
       const resultBuffer = Buffer.from(resultArrayBuffer);
-      console.log(`✅ Local processing successful (${resultBuffer.length} bytes)`);
+      console.log(`✅ Local processing successful (${resultBuffer.length} bytes) at ${quality} quality`);
       
       return resultBuffer;
     } catch (error: any) {
@@ -170,7 +176,8 @@ export class HuggingFaceClient {
   async processWithFallback(
     imageUrl: string,
     prompt: string,
-    modelKey: string = "auto"
+    modelKey: string = "auto",
+    quality: string = "4k"
   ): Promise<{ buffer: Buffer; usedFallback: boolean }> {
     try {
       const buffer = await this.editImage(imageUrl, prompt, modelKey);
@@ -181,8 +188,8 @@ export class HuggingFaceClient {
     } catch (error: any) {
       console.warn("🔄 HF API failed, trying local fallback...");
       
-      // Try local fallback
-      const buffer = await this.fallbackToLocal(imageUrl, prompt);
+      // Try local fallback with quality setting
+      const buffer = await this.fallbackToLocal(imageUrl, prompt, quality);
       if (!buffer) {
         throw new Error("Both HF API and local fallback failed");
       }
