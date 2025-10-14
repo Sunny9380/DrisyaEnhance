@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { useMemo } from "react";
 import { Loader2, Sparkles, Zap, Image as ImageIcon } from "lucide-react";
 
 interface ProcessingAnimation3DProps {
@@ -7,33 +8,48 @@ interface ProcessingAnimation3DProps {
   imageCount?: number;
 }
 
+// Memoized particles with stable random positions
+const createParticles = (count: number) =>
+  Array.from({ length: count }, (_, i) => ({
+    id: i,
+    initialX: `${Math.random() * 100}%`,
+    initialY: `${Math.random() * 100}%`,
+    targetX: (Math.random() - 0.5) * 200,
+    targetY: (Math.random() - 0.5) * 200,
+    duration: Math.random() * 2 + 2,
+    delay: Math.random() * 2,
+  }));
+
 export default function ProcessingAnimation3D({
   progress = 0,
   status = "processing",
   imageCount = 1,
 }: ProcessingAnimation3DProps) {
+  // Memoize particles to prevent regeneration on progress/status updates
+  const particles = useMemo(() => createParticles(20), []);
+
   return (
     <div className="relative w-full h-96 flex items-center justify-center perspective-[1000px]">
       {/* Background particles */}
-      <div className="absolute inset-0 overflow-hidden">
-        {[...Array(20)].map((_, i) => (
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {particles.map((particle) => (
           <motion.div
-            key={i}
+            key={particle.id}
             className="absolute w-2 h-2 bg-primary/30 rounded-full"
             initial={{
-              x: Math.random() * 100 + "%",
-              y: Math.random() * 100 + "%",
+              x: particle.initialX,
+              y: particle.initialY,
               scale: 0,
             }}
             animate={{
               scale: [0, 1, 0],
-              y: [null, (Math.random() - 0.5) * 200],
-              x: [null, (Math.random() - 0.5) * 200],
+              y: particle.targetY,
+              x: particle.targetX,
             }}
             transition={{
-              duration: Math.random() * 2 + 2,
+              duration: particle.duration,
               repeat: Infinity,
-              delay: Math.random() * 2,
+              delay: particle.delay,
             }}
           />
         ))}
