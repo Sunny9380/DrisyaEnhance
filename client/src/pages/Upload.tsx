@@ -30,7 +30,8 @@ import {
   X,
   Check,
   Image as ImageIcon,
-  Archive
+  Archive,
+  Download
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -865,7 +866,7 @@ export default function Upload() {
                     <div>
                       <h3 className="text-lg font-semibold">Your AI Edit History</h3>
                       <p className="text-sm text-muted-foreground">
-                        Recent AI transformations - click to reuse
+                        Recent AI transformations with before/after preview
                       </p>
                     </div>
                     
@@ -878,37 +879,86 @@ export default function Upload() {
                         No AI edits yet. Try transforming an image above!
                       </p>
                     ) : (
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         {edits?.map((edit) => (
                           <div
                             key={edit.id}
-                            className="flex items-center justify-between p-3 border rounded-lg hover-elevate cursor-pointer"
-                            onClick={() => handleCloneEdit(edit)}
+                            className="border rounded-lg overflow-hidden hover-elevate"
                             data-testid={`ai-edit-history-item-${edit.id}`}
                           >
-                            <div className="flex-1">
+                            {/* Image Preview Section */}
+                            {edit.status === "completed" && edit.outputImageUrl && (
+                              <div className="grid grid-cols-2 gap-2 p-3 bg-muted/50">
+                                {/* Before Image */}
+                                <div className="space-y-1">
+                                  <p className="text-xs font-medium text-muted-foreground">Before</p>
+                                  <div className="aspect-square bg-background rounded-md overflow-hidden border">
+                                    <img
+                                      src={edit.inputImageUrl}
+                                      alt="Original"
+                                      className="w-full h-full object-cover"
+                                      data-testid={`img-before-${edit.id}`}
+                                    />
+                                  </div>
+                                </div>
+                                {/* After Image */}
+                                <div className="space-y-1">
+                                  <p className="text-xs font-medium text-muted-foreground">After</p>
+                                  <div className="aspect-square bg-background rounded-md overflow-hidden border">
+                                    <img
+                                      src={edit.outputImageUrl}
+                                      alt="AI Enhanced"
+                                      className="w-full h-full object-cover"
+                                      data-testid={`img-after-${edit.id}`}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* Details Section */}
+                            <div className="p-3 space-y-2">
                               <p className="text-sm font-medium">{edit.prompt}</p>
-                              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                                <Badge variant="outline">{edit.aiModel}</Badge>
-                                <span>{formatDate(edit.createdAt)}</span>
-                                <StatusBadge status={edit.status} />
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <Badge variant="outline">{edit.aiModel}</Badge>
+                                  <Badge variant="outline">{edit.quality || '4K'}</Badge>
+                                  <span>{formatDate(edit.createdAt)}</span>
+                                  <StatusBadge status={edit.status} />
+                                </div>
+                                
+                                {/* Action Buttons */}
+                                {edit.status === "completed" && edit.outputImageUrl && (
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        const link = document.createElement('a');
+                                        link.href = edit.outputImageUrl!;
+                                        link.download = `ai-edit-${edit.id}.png`;
+                                        link.click();
+                                      }}
+                                      data-testid={`button-download-${edit.id}`}
+                                    >
+                                      <Download className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        if (edit.outputImageUrl) {
+                                          window.open(edit.outputImageUrl, "_blank");
+                                        }
+                                      }}
+                                      data-testid={`button-view-result-${edit.id}`}
+                                    >
+                                      <ExternalLink className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                )}
                               </div>
                             </div>
-                            {edit.status === "completed" && edit.outputImageUrl && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (edit.outputImageUrl) {
-                                    window.open(edit.outputImageUrl, "_blank");
-                                  }
-                                }}
-                                data-testid={`button-view-result-${edit.id}`}
-                              >
-                                <ExternalLink className="w-4 h-4" />
-                              </Button>
-                            )}
                           </div>
                         ))}
                       </div>
