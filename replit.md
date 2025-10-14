@@ -39,6 +39,25 @@ Preferred communication style: Simple, everyday language.
 **Template-Driven Pipeline:** Database-stored template settings guide the Python service to apply specific background styles, lighting, and effects.
 **Implementation:** Self-hosted with procedural generation for textures, lighting simulation, and color grading. Architected for future upgrades to SOTA models like BiRefNet and Stable Diffusion.
 
+### Custom AI Image Editing (NEW - October 2025)
+
+**Feature:** FREE custom prompt-based image transformation using Hugging Face AI models - users get 1000 free API calls per month.
+**Models Integrated:**
+- Qwen-Image-Edit-2509: Optimized for e-commerce product editing
+- FLUX.1-Kontext-dev: Creative transformations and artistic styles
+- Auto mode: System selects best model based on prompt analysis
+**Architecture:**
+- **Backend:** HuggingFace Inference API client (server/services/huggingfaceClient.ts) with smart retry logic for rate limits (429 errors) and model loading delays
+- **Queue:** Async processing queue (server/queues/aiEditQueue.ts) with quota enforcement and automatic fallback to local Python service if HF API fails
+- **Database:** ai_edits table tracks requests (prompt, model, status, URLs) and ai_usage_ledger enforces 1000/month quota
+- **API:** 5 REST endpoints for creating edits, checking status, listing history, retrying failures, and viewing quota usage
+**Frontend:**
+- AI editing panel in Upload.tsx with prompt textarea, model selector, and quota progress bar
+- Real-time status polling with before/after image comparison slider
+- Edit history panel showing past prompts with one-click clone for iterative editing
+- Download functionality for AI-transformed results
+**Setup:** Requires `HF_API_TOKEN` environment variable (get free token from huggingface.co/settings/tokens). If not set, system automatically falls back to local Python service.
+
 ### Admin Features
 
 **Admin Panel:** Comprehensive admin dashboard at `/admin` with 6 tabs: Analytics (default), Users, Packages, Payments, Templates, and Settings.

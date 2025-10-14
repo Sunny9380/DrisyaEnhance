@@ -9,8 +9,9 @@ import { createWriteStream } from "fs";
 import archiver from "archiver";
 import axios from "axios";
 import AdmZip from "adm-zip";
-import { insertUserSchema, insertProcessingJobSchema, insertCoinPackageSchema, insertManualTransactionSchema, insertMediaLibrarySchema } from "@shared/schema";
+import { insertUserSchema, insertProcessingJobSchema, insertCoinPackageSchema, insertManualTransactionSchema, insertMediaLibrarySchema, insertAIEditSchema } from "@shared/schema";
 import { sendWelcomeEmail, sendJobCompletedEmail, sendPaymentConfirmedEmail, sendCoinsAddedEmail, shouldSendEmail } from "./email";
+import { aiEditQueue } from "./queues/aiEditQueue";
 
 const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || "http://localhost:5001";
 
@@ -1389,6 +1390,226 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to delete media" });
+    }
+  });
+
+  // ============== AI Editing Routes ==============
+
+  // Create new AI edit request
+  app.post("/api/ai-edits", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      // Validate request body
+      const validatedData = insertAIEditSchema.parse(req.body);
+
+      // Check user quota before accepting request
+      const quotaCheck = await storage.checkAIQuota(req.session.userId);
+      if (!quotaCheck.canUse) {
+        return res.status(403).json({ 
+          message: "AI quota exceeded",
+          quota: {
+            used: quotaCheck.used,
+            limit: quotaCheck.limit,
+            remaining: quotaCheck.remaining
+          }
+        });
+      }
+
+      // Create edit record in database
+      const edit = await storage.createAIEdit({
+        ...validatedData,
+        userId: req.session.userId,
+      });
+
+      // Queue async processing (don't await)
+      aiEditQueue.processEdit(edit.id).catch((error) => {
+        console.error(`Failed to queue AI edit ${edit.id}:`, error);
+      });
+
+      // Log audit event
+      await logAudit(
+        req.session.userId,
+        "ai_edit_created",
+        getClientIP(req),
+        req.headers["user-agent"],
+        { editId: edit.id, prompt: validatedData.prompt, model: validatedData.aiModel }
+      );
+
+      res.json({
+        editId: edit.id,
+        status: "queued",
+        message: "AI edit request queued for processing"
+      });
+    } catch (error: any) {
+      console.error("AI edit creation error:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message || "Failed to create AI edit" });
+    }
+  });
+
+  // Get edit status
+  app.get("/api/ai-edits/:id", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const edit = await storage.getAIEdit(req.params.id);
+
+      if (!edit) {
+        return res.status(404).json({ message: "Edit not found" });
+      }
+
+      // Ensure user owns this edit
+      if (edit.userId !== req.session.userId) {
+        return res.status(404).json({ message: "Edit not found" });
+      }
+
+      res.json({
+        id: edit.id,
+        status: edit.status,
+        prompt: edit.prompt,
+        aiModel: edit.aiModel,
+        inputImageUrl: edit.inputImageUrl,
+        outputImageUrl: edit.outputImageUrl,
+        errorMessage: edit.errorMessage,
+        cost: edit.cost,
+        metadata: edit.metadata,
+        createdAt: edit.createdAt,
+        completedAt: edit.completedAt,
+      });
+    } catch (error: any) {
+      console.error("Failed to get AI edit:", error);
+      res.status(500).json({ message: error.message || "Failed to get edit status" });
+    }
+  });
+
+  // List user's AI edits
+  app.get("/api/ai-edits", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const edits = await storage.listUserAIEdits(req.session.userId);
+
+      res.json({
+        edits: edits.map(edit => ({
+          id: edit.id,
+          status: edit.status,
+          prompt: edit.prompt,
+          aiModel: edit.aiModel,
+          inputImageUrl: edit.inputImageUrl,
+          outputImageUrl: edit.outputImageUrl,
+          errorMessage: edit.errorMessage,
+          cost: edit.cost,
+          createdAt: edit.createdAt,
+          completedAt: edit.completedAt,
+        }))
+      });
+    } catch (error: any) {
+      console.error("Failed to list AI edits:", error);
+      res.status(500).json({ message: error.message || "Failed to list edits" });
+    }
+  });
+
+  // Retry failed edit
+  app.post("/api/ai-edits/:id/retry", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const edit = await storage.getAIEdit(req.params.id);
+
+      if (!edit) {
+        return res.status(404).json({ message: "Edit not found" });
+      }
+
+      // Ensure user owns this edit
+      if (edit.userId !== req.session.userId) {
+        return res.status(404).json({ message: "Edit not found" });
+      }
+
+      // Check edit status is "failed"
+      if (edit.status !== "failed") {
+        return res.status(400).json({ 
+          message: "Only failed edits can be retried",
+          currentStatus: edit.status
+        });
+      }
+
+      // Check quota before retrying
+      const quotaCheck = await storage.checkAIQuota(req.session.userId);
+      if (!quotaCheck.canUse) {
+        return res.status(403).json({ 
+          message: "AI quota exceeded",
+          quota: {
+            used: quotaCheck.used,
+            limit: quotaCheck.limit,
+            remaining: quotaCheck.remaining
+          }
+        });
+      }
+
+      // Reset status to "queued"
+      await storage.updateAIEdit(req.params.id, {
+        status: "queued",
+        errorMessage: null,
+        metadata: {
+          ...(edit.metadata || {}),
+          retryAt: new Date().toISOString(),
+        }
+      });
+
+      // Re-queue processing
+      aiEditQueue.processEdit(req.params.id).catch((error) => {
+        console.error(`Failed to re-queue AI edit ${req.params.id}:`, error);
+      });
+
+      // Log audit event
+      await logAudit(
+        req.session.userId,
+        "ai_edit_retried",
+        getClientIP(req),
+        req.headers["user-agent"],
+        { editId: req.params.id }
+      );
+
+      res.json({
+        editId: req.params.id,
+        status: "queued",
+        message: "Edit queued for retry"
+      });
+    } catch (error: any) {
+      console.error("Failed to retry AI edit:", error);
+      res.status(500).json({ message: error.message || "Failed to retry edit" });
+    }
+  });
+
+  // Get AI usage quota
+  app.get("/api/ai-usage", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const quotaInfo = await storage.checkAIQuota(req.session.userId);
+
+      res.json({
+        used: quotaInfo.used,
+        limit: quotaInfo.limit,
+        remaining: quotaInfo.remaining,
+        canUse: quotaInfo.canUse,
+      });
+    } catch (error: any) {
+      console.error("Failed to get AI usage:", error);
+      res.status(500).json({ message: error.message || "Failed to get AI usage" });
     }
   });
 

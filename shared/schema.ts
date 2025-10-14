@@ -167,6 +167,36 @@ export const mediaLibrary = pgTable("media_library", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// AI Edits - Track AI-powered image editing requests
+export const aiEdits = pgTable("ai_edits", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  jobId: varchar("job_id").references(() => processingJobs.id), // Optional link to processing job
+  imageId: varchar("image_id").references(() => images.id), // Optional link to specific image
+  prompt: text("prompt").notNull(), // User's editing instruction
+  aiModel: text("ai_model").notNull().default("auto"), // qwen-2509, flux-kontext, auto
+  status: text("status").notNull().default("queued"), // queued, processing, completed, failed
+  inputImageUrl: text("input_image_url").notNull(), // Original image URL
+  outputImageUrl: text("output_image_url"), // AI-edited result URL
+  cost: integer("cost").notNull().default(0), // API cost in cents (0 for free tier)
+  errorMessage: text("error_message"), // Error details if failed
+  metadata: jsonb("metadata"), // Model params, retry count, processing time, etc.
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+// AI Usage Ledger - Track monthly quota usage per user
+export const aiUsageLedger = pgTable("ai_usage_ledger", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id).unique(),
+  month: text("month").notNull().default(sql`to_char(CURRENT_DATE, 'YYYY-MM')`), // e.g., "2025-10"
+  freeRequests: integer("free_requests").notNull().default(0), // Count of HF API free tier calls
+  paidRequests: integer("paid_requests").notNull().default(0), // Count of paid API calls
+  totalCost: integer("total_cost").notNull().default(0), // Total API cost in cents
+  lastReset: timestamp("last_reset").notNull().defaultNow(), // When quota was last reset
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 // Zod schemas for validation
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -252,6 +282,27 @@ export const insertMediaLibrarySchema = createInsertSchema(mediaLibrary).omit({
   createdAt: true,
 });
 
+export const insertAIEditSchema = createInsertSchema(aiEdits).omit({
+  id: true,
+  status: true,
+  outputImageUrl: true,
+  cost: true,
+  errorMessage: true,
+  metadata: true,
+  createdAt: true,
+  completedAt: true,
+});
+
+export const insertAIUsageLedgerSchema = createInsertSchema(aiUsageLedger).omit({
+  id: true,
+  month: true,
+  freeRequests: true,
+  paidRequests: true,
+  totalCost: true,
+  lastReset: true,
+  updatedAt: true,
+});
+
 // TypeScript types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -288,3 +339,9 @@ export type ManualTransaction = typeof manualTransactions.$inferSelect;
 
 export type InsertMediaLibrary = z.infer<typeof insertMediaLibrarySchema>;
 export type MediaLibrary = typeof mediaLibrary.$inferSelect;
+
+export type InsertAIEdit = z.infer<typeof insertAIEditSchema>;
+export type AIEdit = typeof aiEdits.$inferSelect;
+
+export type InsertAIUsageLedger = z.infer<typeof insertAIUsageLedgerSchema>;
+export type AIUsageLedger = typeof aiUsageLedger.$inferSelect;

@@ -22,6 +22,10 @@ import {
   type InsertMediaLibrary,
   type Referral,
   type InsertReferral,
+  type AIEdit,
+  type InsertAIEdit,
+  type AIUsageLedger,
+  type InsertAIUsageLedger,
   users,
   templates,
   processingJobs,
@@ -33,6 +37,8 @@ import {
   manualTransactions,
   mediaLibrary,
   referrals,
+  aiEdits,
+  aiUsageLedger,
 } from "@shared/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 
@@ -133,6 +139,18 @@ export interface IStorage {
     totalCoinsEarned: number;
   }>;
   completeReferral(referralCode: string, referredUserId: string): Promise<void>;
+
+  // AI Edits - AI-powered image editing
+  createAIEdit(edit: InsertAIEdit): Promise<AIEdit>;
+  getAIEdit(id: string): Promise<AIEdit | undefined>;
+  updateAIEdit(id: string, data: Partial<AIEdit>): Promise<void>;
+  listUserAIEdits(userId: string): Promise<AIEdit[]>;
+  
+  // AI Usage Tracking - Monthly quota management
+  getOrCreateAIUsage(userId: string): Promise<AIUsageLedger>;
+  incrementAIUsage(userId: string, isFree: boolean, cost: number): Promise<void>;
+  checkAIQuota(userId: string): Promise<{ canUse: boolean; remaining: number; limit: number; used: number }>;
+  resetMonthlyAIUsage(userId: string): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -745,6 +763,113 @@ export class DbStorage implements IStorage {
         metadata: { referralId: referral.id, referredUserId },
       });
     });
+  }
+
+  // AI Edits - AI-powered image editing
+  async createAIEdit(edit: InsertAIEdit): Promise<AIEdit> {
+    const result = await db.insert(aiEdits).values(edit).returning();
+    return result[0];
+  }
+
+  async getAIEdit(id: string): Promise<AIEdit | undefined> {
+    const result = await db.select().from(aiEdits).where(eq(aiEdits.id, id)).limit(1);
+    return result[0];
+  }
+
+  async updateAIEdit(id: string, data: Partial<AIEdit>): Promise<void> {
+    await db.update(aiEdits).set(data).where(eq(aiEdits.id, id));
+  }
+
+  async listUserAIEdits(userId: string): Promise<AIEdit[]> {
+    return await db
+      .select()
+      .from(aiEdits)
+      .where(eq(aiEdits.userId, userId))
+      .orderBy(desc(aiEdits.createdAt));
+  }
+
+  // AI Usage Tracking - Monthly quota management
+  async getOrCreateAIUsage(userId: string): Promise<AIUsageLedger> {
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    
+    // Try to get existing record
+    const existing = await db
+      .select()
+      .from(aiUsageLedger)
+      .where(eq(aiUsageLedger.userId, userId))
+      .limit(1);
+
+    if (existing[0]) {
+      // Check if month has changed, reset if needed
+      if (existing[0].month !== currentMonth) {
+        await db
+          .update(aiUsageLedger)
+          .set({
+            month: currentMonth,
+            freeRequests: 0,
+            paidRequests: 0,
+            totalCost: 0,
+            lastReset: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(aiUsageLedger.userId, userId));
+        
+        return await this.getOrCreateAIUsage(userId);
+      }
+      return existing[0];
+    }
+
+    // Create new record
+    const result = await db
+      .insert(aiUsageLedger)
+      .values({ userId })
+      .returning();
+    return result[0];
+  }
+
+  async incrementAIUsage(userId: string, isFree: boolean, cost: number): Promise<void> {
+    const usage = await this.getOrCreateAIUsage(userId);
+    
+    await db
+      .update(aiUsageLedger)
+      .set({
+        freeRequests: isFree ? usage.freeRequests + 1 : usage.freeRequests,
+        paidRequests: !isFree ? usage.paidRequests + 1 : usage.paidRequests,
+        totalCost: usage.totalCost + cost,
+        updatedAt: new Date(),
+      })
+      .where(eq(aiUsageLedger.userId, userId));
+  }
+
+  async checkAIQuota(userId: string): Promise<{ canUse: boolean; remaining: number; limit: number; used: number }> {
+    const usage = await this.getOrCreateAIUsage(userId);
+    const freeLimit = 1000; // HuggingFace free tier limit per month
+    
+    const remaining = freeLimit - usage.freeRequests;
+    const canUse = remaining > 0;
+    
+    return {
+      canUse,
+      remaining: Math.max(0, remaining),
+      limit: freeLimit,
+      used: usage.freeRequests,
+    };
+  }
+
+  async resetMonthlyAIUsage(userId: string): Promise<void> {
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    
+    await db
+      .update(aiUsageLedger)
+      .set({
+        month: currentMonth,
+        freeRequests: 0,
+        paidRequests: 0,
+        totalCost: 0,
+        lastReset: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(aiUsageLedger.userId, userId));
   }
 }
 

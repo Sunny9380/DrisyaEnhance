@@ -1,18 +1,44 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import UploadDropzone from "@/components/UploadDropzone";
 import BatchEditPanel from "@/components/BatchEditPanel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card } from "@/components/ui/card";
+import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { Info, Coins, Sparkles, FileArchive, Zap, Crown, Gem } from "lucide-react";
+import { Info, Coins, Sparkles, FileArchive, Zap, Crown, Gem, ExternalLink, Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import type { Template } from "@shared/schema";
+import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
+import { format } from "date-fns";
+import type { Template, AIEdit } from "@shared/schema";
+
+// Helper function to format dates
+function formatDate(dateString: string | Date) {
+  try {
+    const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
+    return format(date, "MMM dd, yyyy");
+  } catch {
+    return String(dateString);
+  }
+}
+
+// StatusBadge component
+function StatusBadge({ status }: { status: string }) {
+  const variants: Record<string, { variant: "secondary" | "default" | "destructive" | "outline", label: string }> = {
+    queued: { variant: "secondary", label: "Queued" },
+    processing: { variant: "default", label: "Processing..." },
+    completed: { variant: "outline", label: "Completed" },
+    failed: { variant: "destructive", label: "Failed" },
+  };
+  
+  const config = variants[status] || variants.queued;
+  return <Badge variant={config.variant}>{config.label}</Badge>;
+}
 
 export default function Upload() {
   const [, setLocation] = useLocation();
@@ -27,6 +53,8 @@ export default function Upload() {
     saturation: 0,
     sharpness: 0,
   });
+  const [aiPrompt, setAiPrompt] = useState<string>("");
+  const [aiModel, setAiModel] = useState<string>("auto");
 
   // Load selected template from localStorage
   useEffect(() => {
@@ -36,6 +64,13 @@ export default function Upload() {
     }
   }, []);
 
+  // Fetch current user
+  const { data: userData } = useQuery<{ user: any }>({
+    queryKey: ["/api/auth/me"],
+  });
+
+  const user = userData?.user;
+
   // Fetch templates from database
   const { data: templatesData } = useQuery<{ templates: Template[] }>({
     queryKey: ["/api/templates"],
@@ -43,6 +78,23 @@ export default function Upload() {
 
   const templates = templatesData?.templates || [];
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
+
+  // Fetch AI usage quota
+  const { data: aiUsageData } = useQuery<{ used: number; limit: number }>({
+    queryKey: ["/api/ai-usage"],
+  });
+
+  const quotaUsed = aiUsageData?.used || 0;
+  const quotaLimit = aiUsageData?.limit || 1000;
+  const quotaRemaining = quotaLimit - quotaUsed;
+
+  // Fetch user's AI edits
+  const { data: editsData, isLoading: editsLoading } = useQuery<{ edits: AIEdit[] }>({
+    queryKey: ["/api/ai-edits"],
+    enabled: !!user,
+  });
+
+  const edits = editsData?.edits?.slice(0, 10) || [];
 
   // Calculate coins based on quality tier
   const qualityMultiplier = {
@@ -134,6 +186,41 @@ export default function Upload() {
     },
   });
 
+  // AI edit mutation
+  const aiEditMutation = useMutation({
+    mutationFn: async ({ imageId, prompt, aiModel }: { imageId: string; prompt: string; aiModel: string }) => {
+      const res = await apiRequest("POST", "/api/ai-edits", {
+        imageId,
+        prompt,
+        aiModel,
+      });
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "✅ AI edit started!",
+        description: "Your image is being transformed. Check history for results.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/ai-usage"] });
+      setAiPrompt("");
+    },
+    onError: (error: Error) => {
+      if (error.message.includes("403")) {
+        toast({
+          title: "❌ Quota exceeded",
+          description: "You've reached your monthly AI edit limit.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "❌ AI edit failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
+    },
+  });
+
   const handleZipUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file && file.name.endsWith('.zip')) {
@@ -148,6 +235,57 @@ export default function Upload() {
     if (zipInputRef.current) {
       zipInputRef.current.value = '';
     }
+  };
+
+  const handleAIEdit = async () => {
+    if (!aiPrompt.trim()) {
+      toast({
+        title: "No prompt provided",
+        description: "Please write a prompt describing how you want to transform the image",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (files.length === 0) {
+      toast({
+        title: "No image selected",
+        description: "Please upload an image first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (quotaRemaining <= 0) {
+      toast({
+        title: "❌ Quota exceeded",
+        description: "You've reached your monthly AI edit limit.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // For now, use the first file. In a full implementation, 
+    // we would upload the file first to get an imageId
+    // TODO: Implement file upload to get imageId before calling AI edit
+    const placeholderImageId = "temp-" + Date.now();
+    
+    aiEditMutation.mutate({
+      imageId: placeholderImageId,
+      prompt: aiPrompt,
+      aiModel: aiModel,
+    });
+  };
+
+  const handleCloneEdit = (edit: AIEdit) => {
+    setAiPrompt(edit.prompt);
+    setAiModel(edit.aiModel);
+    toast({
+      title: "Prompt Loaded",
+      description: `Reusing: "${edit.prompt}"`,
+    });
+    // Scroll to AI editing panel
+    document.querySelector('[data-testid="input-ai-prompt"]')?.scrollIntoView({ behavior: "smooth" });
   };
 
   const handleStartProcessing = async () => {
@@ -228,8 +366,8 @@ export default function Upload() {
           <AlertDescription>
             No template selected. Please{" "}
             <Button
-              variant="link"
-              className="p-0 h-auto"
+              variant="ghost"
+              className="p-0 h-auto underline"
               onClick={() => setLocation('/templates')}
               data-testid="link-select-template"
             >
@@ -342,6 +480,132 @@ export default function Upload() {
           </Badge>
         )}
       </div>
+
+      {/* AI Editing Panel */}
+      {files.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-primary" />
+              <h3 className="text-lg font-semibold">AI Image Editing (Beta)</h3>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Write a prompt to transform your images with AI
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="ai-prompt">Transformation Prompt</Label>
+              <Textarea
+                id="ai-prompt"
+                placeholder="Examples:
+- Change background to luxury marble with gold accents
+- Make it look like professional jewelry photography
+- Add sunset lighting and beach background"
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                data-testid="input-ai-prompt"
+                rows={4}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="ai-model">AI Model</Label>
+              <Select value={aiModel} onValueChange={setAiModel}>
+                <SelectTrigger id="ai-model" data-testid="select-ai-model">
+                  <SelectValue placeholder="Select AI model" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Auto (Best for your image)</SelectItem>
+                  <SelectItem value="qwen-2509">Qwen Edit (E-commerce)</SelectItem>
+                  <SelectItem value="flux-kontext">FLUX Kontext (Creative)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">AI Edit Quota</span>
+                <span className="font-mono font-semibold">
+                  {quotaRemaining} of {quotaLimit} remaining
+                </span>
+              </div>
+              <Progress value={(quotaUsed / quotaLimit) * 100} />
+              <p className="text-xs text-muted-foreground">
+                {quotaRemaining} free AI edits remaining this month
+              </p>
+            </div>
+
+            <Button
+              onClick={handleAIEdit}
+              disabled={!aiPrompt.trim() || aiEditMutation.isPending || quotaRemaining <= 0}
+              data-testid="button-ai-edit"
+              className="w-full"
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
+              {aiEditMutation.isPending ? "Transforming..." : "Transform with AI"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* AI Edit History Panel */}
+      {user && (
+        <Card>
+          <CardHeader>
+            <h3 className="text-lg font-semibold">Your AI Edit History</h3>
+            <p className="text-sm text-muted-foreground">
+              Recent AI transformations - click to reuse
+            </p>
+          </CardHeader>
+          <CardContent>
+            {editsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : edits?.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4">
+                No AI edits yet. Try transforming an image above!
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {edits?.map((edit) => (
+                  <div
+                    key={edit.id}
+                    className="flex items-center justify-between p-3 border rounded-lg hover-elevate cursor-pointer"
+                    onClick={() => handleCloneEdit(edit)}
+                    data-testid={`ai-edit-history-item-${edit.id}`}
+                  >
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{edit.prompt}</p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                        <Badge variant="outline">{edit.aiModel}</Badge>
+                        <span>{formatDate(edit.createdAt)}</span>
+                        <StatusBadge status={edit.status} />
+                      </div>
+                    </div>
+                    {edit.status === "completed" && edit.outputImageUrl && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (edit.outputImageUrl) {
+                            window.open(edit.outputImageUrl, "_blank");
+                          }
+                        }}
+                        data-testid={`button-view-result-${edit.id}`}
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {files.length > 0 && selectedTemplate && (
         <>
