@@ -109,3 +109,54 @@ Successfully tested end-to-end image processing workflow with 41 demo product im
 **Performance:** Fast template loading (263ms), efficient processing (5-8s/image), stable under load.
 
 See `WORKFLOW_TEST_RESULTS.md` for detailed test documentation.
+
+## Premium 3D Animations (NEW - October 14, 2025)
+
+**Vision:** Luxury jewelry website-inspired 3D animations for premium brand positioning, modeled after high-end e-commerce experiences (webgi-jewelry.vercel.app).
+
+**Technical Stack:**
+- **Framework:** Framer Motion + CSS 3D transforms (chosen over React Three Fiber due to React 18 compatibility)
+- **Performance:** 60fps animations with useMotionValue, useSpring, and memoized components
+- **Architecture:** Hooks properly isolated at component top-level, motion values reused to prevent redundant allocations
+
+**Components Implemented:**
+
+1. **Hero3D** (`client/src/components/3d/Hero3D.tsx`)
+   - Floating parallax image frames with glassmorphism effects
+   - Mouse-responsive 3D rotation and perspective transforms
+   - Flip animation showing before/after transformations on hover
+   - Animated background particles for depth
+   - Smooth spring-based interactions
+
+2. **TemplateCards3D** (`client/src/components/3d/TemplateCards3D.tsx`)
+   - Interactive 3D template gallery with rotation and expansion on hover
+   - Staggered entrance animations with spring physics
+   - Depth-based shadows and perspective
+   - Touch-friendly mobile interactions
+
+3. **ProcessingAnimation3D** (`client/src/components/3d/ProcessingAnimation3D.tsx`)
+   - 3D particle effects during image processing
+   - Rotating progress indicator with depth
+   - Visual feedback for processing states
+   - Smooth transitions and easing
+
+4. **ImageCarousel3D** (`client/src/components/3d/ImageCarousel3D.tsx`)
+   - Rotating 3D image carousel for gallery display
+   - Depth-based perspective and layering
+   - Swipe and keyboard navigation
+   - Auto-rotation with pause on interaction
+
+**Showcase Page:** `/showcase-3d` - Dedicated demo page featuring all 3D components with interactive examples and parameter controls.
+
+**Performance Optimizations:**
+- All hooks (useMotionValue, useSpring, useTransform) called at component top-level
+- Particles and image arrays wrapped in useMemo to prevent regeneration
+- Motion values reused across child components via props
+- Child components extracted to isolate hook usage
+- Stable base transforms computed once and shared
+
+**QA Status:** ✅ Architect-approved (October 14, 2025)
+- Hooks compliance verified: No Rules of Hooks violations
+- Performance validated: Smooth 60fps animations, no redundant allocations
+- Integration tested: All components work correctly together
+- Code quality confirmed: Clean structure, maintainable patterns
