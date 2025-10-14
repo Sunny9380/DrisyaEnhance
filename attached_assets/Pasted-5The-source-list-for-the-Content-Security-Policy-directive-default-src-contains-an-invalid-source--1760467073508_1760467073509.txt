@@ -1,0 +1,76 @@
+5The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.Understand this error
+15The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?Understand this error
+15The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.Understand this error
+_app-b21897e356c89962.js:28 
+      /////////////////////
+   ///////////////////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////        Curious and driven?
+  ///////////////@@@@@@@///////        Work with us!
+  ///////////////@@@@@@@///////
+  ///////////////@@@@@@@///////        https://join.replit.com/hack.with.us
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@#//////////////
+   ///////////////////////////
+      /////////////////////
+      
+DrisyaEnhance:1 The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.Understand this error
+DrisyaEnhance:1 The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?Understand this error
+DrisyaEnhance:1 The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.Understand this error
+_app-b21897e356c89962.js:28 [LaunchDarkly] LaunchDarkly client initialized
+analytics.tiktok.com/i18n/pixel/events.js?sdkid=D004GE3C77U8PIVDSDJG&lib=ttq:1  Failed to load resource: net::ERR_NAME_NOT_RESOLVEDUnderstand this error
+DrisyaEnhance:1 Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner.
+_app-b21897e356c89962.js:28 Adding extension: Perplexity Object
+7Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.Understand this error
+framework-4471af6c66df5147.js:1 Unrecognized feature: 'ambient-light-sensor'.
+_ @ framework-4471af6c66df5147.js:1Understand this warning
+framework-4471af6c66df5147.js:1 Unrecognized feature: 'battery'.
+_ @ framework-4471af6c66df5147.js:1Understand this warning
+framework-4471af6c66df5147.js:1 Unrecognized feature: 'execution-while-not-rendered'.
+_ @ framework-4471af6c66df5147.js:1Understand this warning
+framework-4471af6c66df5147.js:1 Unrecognized feature: 'execution-while-out-of-viewport'.
+_ @ framework-4471af6c66df5147.js:1Understand this warning
+framework-4471af6c66df5147.js:1 Unrecognized feature: 'layout-animations'.
+_ @ framework-4471af6c66df5147.js:1Understand this warning
+framework-4471af6c66df5147.js:1 Unrecognized feature: 'legacy-image-formats'.
+_ @ framework-4471af6c66df5147.js:1Understand this warning
+framework-4471af6c66df5147.js:1 Unrecognized feature: 'navigation-override'.
+_ @ framework-4471af6c66df5147.js:1Understand this warning
+framework-4471af6c66df5147.js:1 Unrecognized feature: 'oversized-images'.
+_ @ framework-4471af6c66df5147.js:1Understand this warning
+framework-4471af6c66df5147.js:1 Unrecognized feature: 'publickey-credentials'.
+_ @ framework-4471af6c66df5147.js:1Understand this warning
+framework-4471af6c66df5147.js:1 Unrecognized feature: 'speaker-selection'.
+_ @ framework-4471af6c66df5147.js:1Understand this warning
+framework-4471af6c66df5147.js:1 Unrecognized feature: 'unoptimized-images'.
+_ @ framework-4471af6c66df5147.js:1Understand this warning
+framework-4471af6c66df5147.js:1 Unrecognized feature: 'unsized-media'.
+_ @ framework-4471af6c66df5147.js:1Understand this warning
+framework-4471af6c66df5147.js:1 Unrecognized feature: 'pointer-lock'.
+_ @ framework-4471af6c66df5147.js:1Understand this warning
+framework-4471af6c66df5147.js:1 Allow attribute will take precedence over 'allowfullscreen'.
+_ @ framework-4471af6c66df5147.js:1Understand this warning
+framework-4471af6c66df5147.js:1 Allow attribute will take precedence over 'allowpaymentrequest'.
+_ @ framework-4471af6c66df5147.js:1Understand this warning
+_app-b21897e356c89962.js:28 Command: hello has unrecognized contributions: editor-context-menu. Valid contributions are commandbar,filetree-context-menu,sidebar-search,editor-context-menu Object
+(anonymous) @ _app-b21897e356c89962.js:28Understand this warning
+_app-b21897e356c89962.js:28 Adding extension: ZIP Extractor Object
+68c9ad4d4cddb58cf3a1f93d/:1  Failed to load resource: the server responded with a status of 502 ()Understand this error
+68c9ad4d4cddb58cf3a1f93d/:1  Failed to load resource: the server responded with a status of 502 ()Understand this error
+workspace_iframe.html?initialPath=%2F&id=%3Ar2a0%3A:32 Unrecognized feature: 'ambient-light-sensor'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar2a0%3A:32 Unrecognized feature: 'battery'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar2a0%3A:32 Unrecognized feature: 'execution-while-not-rendered'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar2a0%3A:32 Unrecognized feature: 'execution-while-out-of-viewport'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar2a0%3A:32 Unrecognized feature: 'layout-animations'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar2a0%3A:32 Unrecognized feature: 'legacy-image-formats'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar2a0%3A:32 Unrecognized feature: 'navigation-override'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar2a0%3A:32 Unrecognized feature: 'oversized-images'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar2a0%3A:32 Unrecognized feature: 'publickey-credentials'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar2a0%3A:32 Unrecognized feature: 'speaker-selection'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar2a0%3A:32 Unrecognized feature: 'unoptimized-images'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar2a0%3A:32 Unrecognized feature: 'unsized-media'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar2a0%3A:32 Allow attribute will take precedence over 'allowfullscreen'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar2a0%3A:32 Allow attribute will take precedence over 'allowpaymentrequest'.Understand this warning
+68c9ad4d4cddb58cf3a1f93d/:1  Failed to load resource: the server responded with a status of 502 ()
