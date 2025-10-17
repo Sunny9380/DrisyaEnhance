@@ -4,7 +4,8 @@ import TemplateConfigurator from "@/components/TemplateConfigurator";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Download, Share2 } from "lucide-react";
 import { Link } from "wouter";
-import earringsWhiteBg from "@assets/WhatsApp Image 2025-10-12 at 14.02.54_bef9f90d_1760283307730.jpg";
+// Placeholder image - replace with actual demo image later
+const sampleImage = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzY2NzI4NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkRlbW8gSW1hZ2U8L3RleHQ+PC9zdmc+";
 
 interface TemplateConfig {
   background: string;
@@ -130,7 +131,7 @@ export default function CustomizeTemplate() {
                   className="relative"
                 >
                   <img
-                    src={earringsWhiteBg}
+                    src={sampleImage}
                     alt="Product preview"
                     className={`w-full rounded-2xl transition-all duration-500 ${getLightingEffect()} ${getEffectsClasses()}`}
                     data-testid="preview-image"
