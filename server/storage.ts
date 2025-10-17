@@ -173,7 +173,8 @@ export class DbStorage implements IStorage {
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const result = await db.insert(users).values(insertUser).returning();
+    await db.insert(users).values(insertUser);
+    const result = await db.select().from(users).where(eq(users.email, insertUser.email)).limit(1);
     return result[0];
   }
 
@@ -200,7 +201,7 @@ export class DbStorage implements IStorage {
             sql`${users.coinBalance} + ${amount} >= 0`
           )
         )
-        .returning();
+;
 
       if (result.length === 0) {
         throw new Error("Insufficient coins or user not found");
@@ -356,17 +357,18 @@ export class DbStorage implements IStorage {
   }
 
   async createTemplate(insertTemplate: InsertTemplate): Promise<Template> {
-    const result = await db.insert(templates).values(insertTemplate).returning();
+    const insertResult = await db.insert(templates).values(insertTemplate).$returningId();
+    const result = await db.select().from(templates).where(eq(templates.id, insertResult[0].id)).limit(1);
     return result[0];
   }
 
   async updateTemplate(id: string, data: Partial<InsertTemplate>): Promise<Template> {
-    const result = await db
+    await db
       .update(templates)
       .set(data)
-      .where(eq(templates.id, id))
-      .returning();
+      .where(eq(templates.id, id));
     
+    const result = await db.select().from(templates).where(eq(templates.id, id)).limit(1);
     if (result.length === 0) {
       throw new Error("Template not found");
     }

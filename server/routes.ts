@@ -13,8 +13,6 @@ import { insertUserSchema, insertProcessingJobSchema, insertCoinPackageSchema, i
 import { sendWelcomeEmail, sendJobCompletedEmail, sendPaymentConfirmedEmail, sendCoinsAddedEmail, shouldSendEmail } from "./email";
 import { aiEditQueue } from "./queues/aiEditQueue";
 
-const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || "http://localhost:5001";
-
 // Helper function to log audit events (IP tracking for SaaS security)
 async function logAudit(
   userId: string | undefined,
@@ -46,69 +44,6 @@ function getClientIP(req: Request): string {
   );
 }
 
-// Helper function to process image with Python AI service
-// Create Axios client with proxy disabled for localhost to avoid "helium" DNS errors
-const aiServiceClient = axios.create({
-  baseURL: PYTHON_SERVICE_URL,
-  proxy: false,
-  timeout: 30000,
-});
-
-async function processImageWithAI(
-  imagePath: string,
-  templateSettings: any
-): Promise<string> {
-  const maxRetries = 3;
-  let lastError: any;
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      // Read image file
-      const imageBuffer = await fs.readFile(imagePath);
-      const imageBase64 = imageBuffer.toString("base64");
-
-      // Call Python service with advanced template settings
-      const response = await aiServiceClient.post('/process', {
-        image: imageBase64,
-        template_settings: templateSettings,
-        remove_background: true,
-      });
-
-      if (!response.data.success) {
-        throw new Error(response.data.error || "Processing failed");
-      }
-
-      // Return processed image as base64
-      return response.data.image;
-    } catch (error: any) {
-      lastError = error;
-      
-      // Log error with context
-      console.error(`AI service call attempt ${attempt}/${maxRetries} failed:`, {
-        code: error.code,
-        message: error.message,
-        url: PYTHON_SERVICE_URL,
-      });
-
-      // Don't retry on certain errors
-      if (error.response?.status === 400) {
-        throw new Error("Invalid image or template settings");
-      }
-
-      // If not last attempt, wait with exponential backoff
-      if (attempt < maxRetries) {
-        const delay = Math.min(1000 * Math.pow(2, attempt - 1) + Math.random() * 1000, 5000);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
-  }
-
-  // All retries failed
-  if (lastError?.code === "ECONNREFUSED") {
-    throw new Error("Image processing service is not running. Please start the Python service.");
-  }
-  throw new Error(`AI service failed after ${maxRetries} attempts: ${lastError?.message || 'Unknown error'}`);
-}
 
 // Configure multer for file uploads
 const upload = multer({
@@ -1102,39 +1037,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               await Promise.all(
                 batch.map(async (image) => {
                   try {
-                    const originalPath = path.join("uploads", path.basename(image.originalUrl));
-                    
-                    // Process with Python AI service using template settings
-                    const processedBase64 = await processImageWithAI(originalPath, templateSettings);
-                    
-                    // Save processed image
-                    const processedFileName = `processed-${path.basename(image.originalUrl)}.png`;
-                    const processedPath = path.join("uploads", "processed", processedFileName);
-                    const processedBuffer = Buffer.from(processedBase64, "base64");
-                    await fs.writeFile(processedPath, processedBuffer);
-                    
-                    const processedUrl = `/uploads/processed/${processedFileName}`;
-                    
-                    // Update image status
-                    await storage.updateImageStatus(
-                      image.id,
-                      "completed",
-                      processedUrl
-                    );
-                    
-                    // Save to media library
-                    await storage.createMediaLibraryEntry({
-                      userId: job.userId,
-                      jobId: job.id,
-                      imageId: image.id,
-                      fileName: path.basename(image.originalUrl),
-                      processedUrl,
-                      fileSize: processedBuffer.length,
-                      dimensions: "1080x1080",
-                      templateUsed: template.name,
-                      tags: [],
-                      isFavorite: false,
-                    });
+                    // AI processing functionality has been removed
+                    await storage.updateImageStatus(image.id, "failed", null);
+                    throw new Error("AI image processing functionality has been removed");
                   } catch (error) {
                     console.error(`Failed to process image ${image.id}:`, error);
                     await storage.updateImageStatus(image.id, "failed", null);
@@ -1482,28 +1387,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await Promise.all(
               batch.map(async (image) => {
                 try {
-                  const originalPath = path.join("uploads", path.basename(image.originalUrl));
-                  
-                  // Process with Python AI service
-                  const processedBase64 = await processImageWithAI(originalPath, templateSettings);
-                  
-                  // Save processed image
-                  const processedFileName = `processed-${path.basename(image.originalUrl)}.png`;
-                  const processedPath = path.join("uploads", "processed", processedFileName);
-                  const processedBuffer = Buffer.from(processedBase64, "base64");
-                  await fs.writeFile(processedPath, processedBuffer);
-                  
-                  const processedUrl = `/uploads/processed/${processedFileName}`;
-                  
-                  // Update image status
-                  await storage.updateImageStatus(image.id, "completed", processedUrl);
-                  completedCount++;
-                  
-                  // Update job progress
-                  await storage.updateProcessingJob(job.id, {
-                    processedImages: completedCount,
-                    status: completedCount === jobImages.length ? "completed" : "processing",
-                  });
+                  // AI processing functionality has been removed
+                  await storage.updateImageStatus(image.id, "failed", null);
+                  throw new Error("AI image processing functionality has been removed");
                 } catch (error) {
                   console.error(`Failed to process image ${image.id}:`, error);
                   await storage.updateImageStatus(image.id, "failed", null);

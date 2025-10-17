@@ -1,22 +1,22 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, boolean, jsonb } from "drizzle-orm/pg-core";
+import { mysqlTable, text, varchar, int, timestamp, boolean, json, datetime } from "drizzle-orm/mysql-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Users table
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+export const users = mysqlTable("users", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   name: text("name"),
   phone: text("phone"), // WhatsApp number for admin contact
   avatarUrl: text("avatar_url"), // Profile avatar image URL
   referralCode: text("referral_code").unique(), // User's unique referral code
-  coinBalance: integer("coin_balance").notNull().default(0),
+  coinBalance: int("coin_balance").notNull().default(0),
   role: text("role").notNull().default("user"), // user, admin
   userTier: text("user_tier").notNull().default("free"), // free, basic, pro, enterprise
-  monthlyQuota: integer("monthly_quota").notNull().default(50), // Images per month - Free: 50, Basic: 200, Pro: 1000, Enterprise: unlimited
-  monthlyUsage: integer("monthly_usage").notNull().default(0), // Current month's usage
+  monthlyQuota: int("monthly_quota").notNull().default(50), // Images per month - Free: 50, Basic: 200, Pro: 1000, Enterprise: unlimited
+  monthlyUsage: int("monthly_usage").notNull().default(0), // Current month's usage
   quotaResetDate: timestamp("quota_reset_date").notNull().defaultNow(), // When quota resets
   emailNotifications: boolean("email_notifications").notNull().default(true), // Allow users to opt-out
   notifyJobCompletion: boolean("notify_job_completion").notNull().default(true),
@@ -27,47 +27,47 @@ export const users = pgTable("users", {
 });
 
 // Templates table
-export const templates = pgTable("templates", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+export const templates = mysqlTable("templates", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
   name: text("name").notNull(),
   category: text("category").notNull(), // jewelry, fashion, etc.
   backgroundStyle: text("background_style").default("gradient"), // velvet, marble, minimal, gradient, festive
   lightingPreset: text("lighting_preset").default("soft-glow"), // moody, soft-glow, spotlight, studio
   description: text("description"),
   thumbnailUrl: text("thumbnail_url"),
-  settings: jsonb("settings"), // Advanced settings: { diffusionPrompt, shadowIntensity, vignetteStrength, etc. }
+  settings: json("settings"), // Advanced settings: { diffusionPrompt, shadowIntensity, vignetteStrength, etc. }
   isPremium: boolean("is_premium").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
   // Pricing & Product Details
-  coinCost: integer("coin_cost").notNull().default(1), // Cost per image in coins
-  pricePerImage: integer("price_per_image"), // Price in currency (optional, for display)
-  features: jsonb("features"), // Array of feature objects: [{ title, description, icon }]
-  benefits: jsonb("benefits"), // Array of benefit text items
-  useCases: jsonb("use_cases"), // Array of use case objects: [{ title, description, imageUrl }]
+  coinCost: int("coin_cost").notNull().default(1), // Cost per image in coins
+  pricePerImage: int("price_per_image"), // Price in currency (optional, for display)
+  features: json("features"), // Array of feature objects: [{ title, description, icon }]
+  benefits: json("benefits"), // Array of benefit text items
+  useCases: json("use_cases"), // Array of use case objects: [{ title, description, imageUrl }]
   whyBuy: text("why_buy"), // Compelling reason to choose this template
-  testimonials: jsonb("testimonials"), // Array: [{ name, role, content, avatarUrl, rating }]
+  testimonials: json("testimonials"), // Array: [{ name, role, content, avatarUrl, rating }]
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 // Processing jobs table
-export const processingJobs = pgTable("processing_jobs", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id),
-  templateId: varchar("template_id").notNull().references(() => templates.id),
+export const processingJobs = mysqlTable("processing_jobs", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  templateId: varchar("template_id", { length: 36 }).notNull().references(() => templates.id),
   status: text("status").notNull().default("queued"), // queued, processing, completed, failed
-  totalImages: integer("total_images").notNull(),
-  processedImages: integer("processed_images").notNull().default(0),
-  coinsUsed: integer("coins_used").notNull(),
-  batchSettings: jsonb("batch_settings"), // brightness, contrast, etc.
+  totalImages: int("total_images").notNull(),
+  processedImages: int("processed_images").notNull().default(0),
+  coinsUsed: int("coins_used").notNull(),
+  batchSettings: json("batch_settings"), // brightness, contrast, etc.
   zipUrl: text("zip_url"), // URL to download processed images
   createdAt: timestamp("created_at").notNull().defaultNow(),
-  completedAt: timestamp("completed_at"),
+  completedAt: datetime("completed_at"),
 });
 
 // Images table
-export const images = pgTable("images", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  jobId: varchar("job_id").notNull().references(() => processingJobs.id),
+export const images = mysqlTable("images", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`UNHEX(REPLACE(UUID(), '-', ''))`),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => processingJobs.id),
   originalUrl: text("original_url").notNull(),
   processedUrl: text("processed_url"),
   status: text("status").notNull().default("pending"), // pending, processing, completed, failed
@@ -75,143 +75,143 @@ export const images = pgTable("images", {
 });
 
 // Transactions table for coin purchases and usage
-export const transactions = pgTable("transactions", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id),
+export const transactions = mysqlTable("transactions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`UNHEX(REPLACE(UUID(), '-', ''))`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
   type: text("type").notNull(), // purchase, usage, refund, referral
-  amount: integer("amount").notNull(), // positive for credit, negative for debit
+  amount: int("amount").notNull(), // positive for credit, negative for debit
   description: text("description").notNull(),
-  metadata: jsonb("metadata"), // Additional data like job_id, payment_id, etc.
+  metadata: json("metadata"), // Additional data like job_id, payment_id, etc.
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 // Template favorites
-export const templateFavorites = pgTable("template_favorites", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id),
-  templateId: varchar("template_id").notNull().references(() => templates.id),
+export const templateFavorites = mysqlTable("template_favorites", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`UNHEX(REPLACE(UUID(), '-', ''))`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  templateId: varchar("template_id", { length: 36 }).notNull().references(() => templates.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 // Team members
-export const teamMembers = pgTable("team_members", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  organizationId: varchar("organization_id").notNull().references(() => users.id), // References admin user
-  userId: varchar("user_id").notNull().references(() => users.id),
+export const teamMembers = mysqlTable("team_members", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`UNHEX(REPLACE(UUID(), '-', ''))`),
+  organizationId: varchar("organization_id", { length: 36 }).notNull().references(() => users.id), // References admin user
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
   role: text("role").notNull(), // admin, editor, viewer
   status: text("status").notNull().default("pending"), // pending, active, inactive
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 // Referrals
-export const referrals = pgTable("referrals", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  referrerId: varchar("referrer_id").notNull().references(() => users.id),
-  referredUserId: varchar("referred_user_id").references(() => users.id),
+export const referrals = mysqlTable("referrals", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`UNHEX(REPLACE(UUID(), '-', ''))`),
+  referrerId: varchar("referrer_id", { length: 36 }).notNull().references(() => users.id),
+  referredUserId: varchar("referred_user_id", { length: 36 }).references(() => users.id),
   referralCode: text("referral_code").notNull().unique(),
   status: text("status").notNull().default("pending"), // pending, completed
-  coinsEarned: integer("coins_earned").notNull().default(0),
+  coinsEarned: int("coins_earned").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-  completedAt: timestamp("completed_at"),
+  completedAt: datetime("completed_at"),
 });
 
 // Security Audit Logs - Track IP addresses and user actions for SaaS security
-export const auditLogs = pgTable("audit_logs", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").references(() => users.id), // nullable for anonymous actions
+export const auditLogs = mysqlTable("audit_logs", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`UNHEX(REPLACE(UUID(), '-', ''))`),
+  userId: varchar("user_id", { length: 36 }).references(() => users.id), // nullable for anonymous actions
   action: text("action").notNull(), // login, logout, upload, process, download, etc.
   ipAddress: text("ip_address").notNull(),
   userAgent: text("user_agent"),
-  metadata: jsonb("metadata"), // Additional context (template_id, job_id, file_count, etc.)
+  metadata: json("metadata"), // Additional context (template_id, job_id, file_count, etc.)
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 // Coin Packages - Admin defines pricing packages (e.g., 100 coins = ₹500)
-export const coinPackages = pgTable("coin_packages", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+export const coinPackages = mysqlTable("coin_packages", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`UNHEX(REPLACE(UUID(), '-', ''))`),
   name: text("name").notNull(), // e.g., "Starter Pack", "Professional Pack"
-  coinAmount: integer("coin_amount").notNull(), // Number of coins in the package
-  priceInINR: integer("price_in_inr").notNull(), // Price in Indian Rupees
-  discount: integer("discount").default(0), // Discount percentage (0-100)
+  coinAmount: int("coin_amount").notNull(), // Number of coins in the package
+  priceInINR: int("price_in_inr").notNull(), // Price in Indian Rupees
+  discount: int("discount").default(0), // Discount percentage (0-100)
   description: text("description"), // e.g., "Best value for regular users"
   isActive: boolean("is_active").notNull().default(true),
-  displayOrder: integer("display_order").notNull().default(0), // Sort order for display
+  displayOrder: int("display_order").notNull().default(0), // Sort order for display
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 // Manual Transactions - Track WhatsApp/manual payments and admin fulfillment
-export const manualTransactions = pgTable("manual_transactions", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id),
-  packageId: varchar("package_id").references(() => coinPackages.id), // Optional reference to package
-  coinAmount: integer("coin_amount").notNull(), // Coins to be credited
-  priceInINR: integer("price_in_inr").notNull(), // Amount paid by user
+export const manualTransactions = mysqlTable("manual_transactions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`UNHEX(REPLACE(UUID(), '-', ''))`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  packageId: varchar("package_id", { length: 36 }).references(() => coinPackages.id), // Optional reference to package
+  coinAmount: int("coin_amount").notNull(), // Coins to be credited
+  priceInINR: int("price_in_inr").notNull(), // Amount paid by user
   paymentMethod: text("payment_method").notNull().default("whatsapp"), // whatsapp, bank_transfer, upi, etc.
   paymentReference: text("payment_reference"), // WhatsApp message ID, transaction ID, etc.
-  adminId: varchar("admin_id").references(() => users.id), // Admin who processed this
+  adminId: varchar("admin_id", { length: 36 }).references(() => users.id), // Admin who processed this
   adminNotes: text("admin_notes"), // Admin's internal notes
   userPhone: text("user_phone"), // Contact number for verification
   status: text("status").notNull().default("pending"), // pending, approved, rejected, completed
   createdAt: timestamp("created_at").notNull().defaultNow(),
-  approvedAt: timestamp("approved_at"), // When admin approved the payment
-  completedAt: timestamp("completed_at"), // When coins were credited
+  approvedAt: datetime("approved_at"), // When admin approved the payment
+  completedAt: datetime("completed_at"), // When coins were credited
 });
 
 // Media Library - Store all processed images for user access and management
-export const mediaLibrary = pgTable("media_library", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id),
-  jobId: varchar("job_id").references(() => processingJobs.id), // Optional reference to processing job
-  imageId: varchar("image_id").references(() => images.id), // Optional reference to specific image
+export const mediaLibrary = mysqlTable("media_library", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`UNHEX(REPLACE(UUID(), '-', ''))`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  jobId: varchar("job_id", { length: 36 }).references(() => processingJobs.id), // Optional reference to processing job
+  imageId: varchar("image_id", { length: 36 }).references(() => images.id), // Optional reference to specific image
   fileName: text("file_name").notNull(), // Original filename
   processedUrl: text("processed_url").notNull(), // URL to processed image
   thumbnailUrl: text("thumbnail_url"), // Optional thumbnail for faster loading
-  fileSize: integer("file_size"), // File size in bytes
+  fileSize: int("file_size"), // File size in bytes
   dimensions: text("dimensions"), // e.g., "1080x1080"
   templateUsed: text("template_used"), // Template name used for processing
-  tags: text("tags").array(), // User-defined tags for organization
+  tags: json("tags"), // User-defined tags for organization (stored as JSON array)
   isFavorite: boolean("is_favorite").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 // AI Edits - Track AI-powered image editing requests
-export const aiEdits = pgTable("ai_edits", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id),
-  jobId: varchar("job_id").references(() => processingJobs.id), // Optional link to processing job
-  imageId: varchar("image_id").references(() => images.id), // Optional link to specific image
+export const aiEdits = mysqlTable("ai_edits", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`UNHEX(REPLACE(UUID(), '-', ''))`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  jobId: varchar("job_id", { length: 36 }).references(() => processingJobs.id), // Optional link to processing job
+  imageId: varchar("image_id", { length: 36 }).references(() => images.id), // Optional link to specific image
   prompt: text("prompt").notNull(), // User's editing instruction
   aiModel: text("ai_model").notNull().default("auto"), // qwen-2509, flux-kontext, auto
   quality: text("quality").notNull().default("4k"), // 4k, hd, standard - output quality level
   status: text("status").notNull().default("queued"), // queued, processing, completed, failed
   inputImageUrl: text("input_image_url").notNull(), // Original image URL
   outputImageUrl: text("output_image_url"), // AI-edited result URL
-  cost: integer("cost").notNull().default(0), // API cost in cents (0 for free tier)
+  cost: int("cost").notNull().default(0), // API cost in cents (0 for free tier)
   errorMessage: text("error_message"), // Error details if failed
-  metadata: jsonb("metadata"), // Model params, retry count, processing time, etc.
+  metadata: json("metadata"), // Model params, retry count, processing time, etc.
   createdAt: timestamp("created_at").notNull().defaultNow(),
-  completedAt: timestamp("completed_at"),
+  completedAt: datetime("completed_at"),
 });
 
 // AI Usage Ledger - Track monthly quota usage per user
-export const aiUsageLedger = pgTable("ai_usage_ledger", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id).unique(),
-  month: text("month").notNull().default(sql`to_char(CURRENT_DATE, 'YYYY-MM')`), // e.g., "2025-10"
-  freeRequests: integer("free_requests").notNull().default(0), // Count of HF API free tier calls
-  paidRequests: integer("paid_requests").notNull().default(0), // Count of paid API calls
-  totalCost: integer("total_cost").notNull().default(0), // Total API cost in cents
+export const aiUsageLedger = mysqlTable("ai_usage_ledger", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`UNHEX(REPLACE(UUID(), '-', ''))`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id).unique(),
+  month: text("month").notNull().default(sql`DATE_FORMAT(CURRENT_DATE, '%Y-%m')`), // e.g., "2025-10"
+  freeRequests: int("free_requests").notNull().default(0), // Count of HF API free tier calls
+  paidRequests: int("paid_requests").notNull().default(0), // Count of paid API calls
+  totalCost: int("total_cost").notNull().default(0), // Total API cost in cents
   lastReset: timestamp("last_reset").notNull().defaultNow(), // When quota was last reset
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 // Background Library - 1000+ background images for templates
-export const backgrounds = pgTable("backgrounds", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+export const backgrounds = mysqlTable("backgrounds", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`UNHEX(REPLACE(UUID(), '-', ''))`),
   name: text("name").notNull(), // Display name
   category: text("category").notNull(), // fabrics, textures, gradients, nature, abstract, marble, velvet, etc.
-  tags: text("tags").array(), // Searchable tags: ["luxury", "dark", "elegant"]
+  tags: json("tags"), // Searchable tags: ["luxury", "dark", "elegant"] (stored as JSON array)
   imageUrl: text("image_url").notNull(), // Full resolution background URL
   thumbnailUrl: text("thumbnail_url"), // Preview thumbnail
   source: text("source").notNull().default("upload"), // unsplash, pexels, upload, ai-generated, premium
@@ -219,7 +219,7 @@ export const backgrounds = pgTable("backgrounds", {
   sourceAuthor: text("source_author"), // Photo credit
   isPremium: boolean("is_premium").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
-  createdBy: varchar("created_by").references(() => users.id), // Admin who added it
+  createdBy: varchar("created_by", { length: 36 }).references(() => users.id), // Admin who added it
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

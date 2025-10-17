@@ -1,36 +1,16 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
-import connectPg from "connect-pg-simple";
+import MySQLStore from "express-mysql-session";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { pool } from "./db";
-import { spawn } from "child_process";
 import path from "path";
 
-// Disable Replit proxy for localhost traffic to avoid "helium" DNS errors
+// Configure localhost traffic
 process.env.NO_PROXY = "localhost,127.0.0.1";
-
-// Start Python image processing service
-const pythonServicePath = path.join(process.cwd(), "python_services", "image_processor.py");
-const pythonProcess = spawn("python3", [pythonServicePath], {
-  cwd: path.join(process.cwd(), "python_services"),
-  env: { ...process.env },
-  stdio: ["ignore", "pipe", "pipe"]
-});
-
-pythonProcess.stdout?.on("data", (data) => {
-  log(`[Python Service] ${data.toString().trim()}`);
-});
-
-pythonProcess.stderr?.on("data", (data) => {
-  log(`[Python Service Error] ${data.toString().trim()}`);
-});
-
-pythonProcess.on("close", (code) => {
-  log(`[Python Service] Process exited with code ${code}`);
-});
-
-log("[Python Service] Starting image processing service on port 5001");
 
 const app = express();
 app.use(express.json());
@@ -40,13 +20,10 @@ app.use(express.urlencoded({ extended: false }));
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Session configuration
-const PgStore = connectPg(session);
+const MySQLStoreSession = MySQLStore(session);
 app.use(
   session({
-    store: new PgStore({
-      pool: pool as any,
-      createTableIfMissing: true,
-    }),
+    store: new MySQLStoreSession({}, pool as any),
     secret: process.env.SESSION_SECRET || "drisya-secret-key-change-in-production",
     resave: false,
     saveUninitialized: false,
@@ -124,11 +101,7 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
+  server.listen(port, () => {
     log(`serving on port ${port}`);
   });
 })();

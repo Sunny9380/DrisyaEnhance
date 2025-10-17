@@ -1,8 +1,43 @@
-Drisya Image Processing - Complete Workflow Test Results
-Test Date: October 13, 2025
-Status: ✅ ALL TESTS PASSED
-Executive Summary
-Successfully tested all 7 workflow components with your demo product images. The system is fully operational and ready for bulk image processing with professional AI-powered background removal and enhancement.
+# Drisya - AI-Powered Image Enhancement Platform
+
+## Overview
+
+Drisya is an enterprise-grade SaaS platform for bulk AI-powered image enhancement and background processing. It allows users to upload product images, apply professional templates for background removal and replacement, and download processed results.
+
+## Quick Start
+
+### Prerequisites
+- **XAMPP** with Apache, MySQL, and phpMyAdmin
+- **Node.js** (v18 or higher)
+- **Python 3.11+** with required packages
+
+### Setup Instructions
+
+1. **Database Setup**
+   - Start XAMPP (Apache + MySQL)
+   - Access phpMyAdmin at `http://localhost/phpmyadmin`
+   - Create database named `drisya`
+   - See `XAMPP_PHPMYADMIN_SETUP.md` for detailed instructions
+
+2. **Environment Configuration**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your database credentials
+   ```
+
+3. **Install Dependencies**
+   ```bash
+   npm install
+   npm run db:push  # Create database tables
+   ```
+
+4. **Start Development Server**
+   ```bash
+   npm run dev
+   ```
+
+## System Status
+✅ **FULLY OPERATIONAL** - Ready for production use with XAMPP/phpMyAdmin setup
 
 Test Results by Component
 1. ✅ Image Upload and Storage
@@ -203,7 +238,7 @@ Services Running:
 
 Main Application: http://localhost:5000 (RUNNING)
 Python Service: http://localhost:5001 (RUNNING)
-Database: PostgreSQL (CONNECTED)
+Database: MySQL via XAMPP (CONNECTED)
 Logs Showing:
 
 Multiple successful image processing requests (200 OK)
