@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Grid as GridIcon, List, Download, Eye, RefreshCw, Plus, Image as ImageIcon, Check, X, Trash, Loader2 } from "lucide-react";
+import { Grid as GridIcon, List, Download, Eye, RefreshCw, Plus, Image as ImageIcon, Check, X, Trash, Loader2, Archive, Upload } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,12 +21,22 @@ interface JobWithImages extends ProcessingJob {
   templateName?: string;
 }
 
-interface FlattenedImage extends Image {
-  jobId: string;
+interface FlattenedImage {
+  id: string;
+  jobId?: string;
   templateName: string;
-  jobStatus: string;
+  jobStatus?: string;
   jobCreatedAt: string | Date;
   originalName: string;
+  type?: 'processed' | 'template';
+  category?: string;
+  isPremium?: boolean;
+  isActive?: boolean;
+  status?: string;
+  originalUrl?: string;
+  processedUrl?: string | null;
+  thumbnailUrl?: string;
+  createdAt?: Date;
 }
 
 function formatDate(dateString: string | Date) {
@@ -41,6 +51,7 @@ function formatDate(dateString: string | Date) {
 export default function Gallery() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const zipInputRef = useRef<HTMLInputElement>(null);
   
   // View mode state
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -48,6 +59,7 @@ export default function Gallery() {
   // Filter states
   const [filter, setFilter] = useState<string>('all');
   const [templateFilter, setTemplateFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   
   // Preview modal state
@@ -60,12 +72,25 @@ export default function Gallery() {
   const [bulkReprocessDialogOpen, setBulkReprocessDialogOpen] = useState(false);
   const [reprocessTemplateId, setReprocessTemplateId] = useState<string>('');
 
-  // Fetch all processing jobs with their images
-  const { data: jobsData, isLoading } = useQuery<{ jobs: JobWithImages[] }>({
-    queryKey: ["/api/jobs"],
+  // Fetch all media (jobs + template images)
+  const { data: mediaData, isLoading, error } = useQuery<{ jobs: JobWithImages[]; templateImages: any[] }>({
+    queryKey: ["/api/media"],
+    retry: false,
   });
 
-  const jobs = jobsData?.jobs || [];
+  // Handle authentication errors
+  useEffect(() => {
+    if (error) {
+      console.error('Media fetch error:', error);
+      const errorMessage = error.message || '';
+      if (errorMessage.includes('401') || errorMessage.includes('Not authenticated')) {
+        setLocation('/login');
+      }
+    }
+  }, [error, setLocation]);
+
+  const jobs = mediaData?.jobs || [];
+  const templateImages = mediaData?.templateImages || [];
 
   // Fetch templates for reprocess dialog
   const { data: templatesData } = useQuery<{ templates: Template[] }>({
@@ -74,9 +99,10 @@ export default function Gallery() {
 
   const templates = templatesData?.templates || [];
 
-  // Flatten jobs into individual images
+  // Flatten jobs into individual images and combine with template images
   const allImages = useMemo(() => {
-    return jobs.flatMap(job => 
+    // Processed images from jobs
+    const processedImages = jobs.flatMap(job => 
       job.images?.map(img => ({
         ...img,
         jobId: job.id,
@@ -84,9 +110,28 @@ export default function Gallery() {
         jobStatus: job.status,
         jobCreatedAt: job.createdAt,
         originalName: img.originalUrl?.split('/').pop()?.split('-').slice(1).join('-') || `image-${img.id.slice(0, 8)}`,
+        type: 'processed' as const,
       })) || []
-    ) as FlattenedImage[];
-  }, [jobs]);
+    );
+
+    // Template thumbnail images
+    const templateThumbnails = templateImages.map(template => ({
+      id: template.id,
+      templateName: template.name,
+      jobCreatedAt: template.createdAt,
+      originalName: template.name,
+      type: 'template' as const,
+      category: template.category,
+      isPremium: template.isPremium,
+      isActive: template.isActive,
+      thumbnailUrl: template.thumbnailUrl,
+      status: 'completed',
+      originalUrl: template.thumbnailUrl,
+      processedUrl: template.thumbnailUrl,
+    }));
+
+    return [...processedImages, ...templateThumbnails] as FlattenedImage[];
+  }, [jobs, templateImages]);
 
   // Get unique template names for filter
   const uniqueTemplates = useMemo(() => {
@@ -106,12 +151,15 @@ export default function Gallery() {
       // Filter by template
       if (templateFilter !== 'all' && img.templateName !== templateFilter) return false;
       
+      // Filter by type
+      if (typeFilter !== 'all' && img.type !== typeFilter) return false;
+      
       // Search by name
       if (searchQuery && !img.originalName.toLowerCase().includes(searchQuery.toLowerCase())) return false;
       
       return true;
     });
-  }, [allImages, filter, templateFilter, searchQuery]);
+  }, [allImages, filter, templateFilter, typeFilter, searchQuery]);
 
   const handleViewToggle = () => {
     setViewMode(prev => prev === 'grid' ? 'list' : 'grid');
@@ -297,6 +345,65 @@ export default function Gallery() {
     });
   };
 
+  // ZIP upload mutation for Media Library
+  const uploadZipMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("zip", file);
+      
+      const res = await fetch("/api/media/upload-zip", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || res.statusText);
+      }
+      
+      return await res.json();
+    },
+    onSuccess: (data: { images: any[]; totalCount: number; message: string }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/media"] });
+      toast({
+        title: "✅ ZIP Upload Successful!",
+        description: `${data.totalCount} images extracted and added to Media Library`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "❌ ZIP Upload Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleZipUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && file.name.endsWith('.zip')) {
+      if (file.size > 500 * 1024 * 1024) { // 500MB limit
+        toast({
+          title: "File Too Large",
+          description: "ZIP file must be smaller than 500MB",
+          variant: "destructive",
+        });
+        return;
+      }
+      uploadZipMutation.mutate(file);
+    } else {
+      toast({
+        title: "Invalid File",
+        description: "Please select a ZIP file",
+        variant: "destructive",
+      });
+    }
+    if (zipInputRef.current) {
+      zipInputRef.current.value = '';
+    }
+  };
+
   return (
     <div className="space-y-6" data-testid="page-gallery">
       {/* Header Section */}
@@ -306,6 +413,25 @@ export default function Gallery() {
           <p className="text-muted-foreground">View and manage all your processed images</p>
         </div>
         <div className="flex gap-2">
+          {/* Hidden ZIP input */}
+          <input
+            ref={zipInputRef}
+            type="file"
+            accept=".zip"
+            className="hidden"
+            onChange={handleZipUpload}
+          />
+          
+          <Button
+            variant="outline"
+            onClick={() => zipInputRef.current?.click()}
+            disabled={uploadZipMutation.isPending}
+            data-testid="button-upload-zip"
+          >
+            <Archive className="w-4 h-4 mr-2" />
+            {uploadZipMutation.isPending ? "Uploading..." : "Upload ZIP"}
+          </Button>
+          
           <Button 
             variant="outline" 
             onClick={handleViewToggle}
@@ -314,6 +440,7 @@ export default function Gallery() {
             {viewMode === 'grid' ? <List className="w-4 h-4 mr-2" /> : <GridIcon className="w-4 h-4 mr-2" />}
             {viewMode === 'grid' ? 'List View' : 'Grid View'}
           </Button>
+          
           <Link to="/upload" data-testid="link-new-project">
             <Button>
               <Plus className="w-4 h-4 mr-2" />
@@ -347,6 +474,17 @@ export default function Gallery() {
               {uniqueTemplates.map(template => (
                 <SelectItem key={template} value={template}>{template}</SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-[200px]" data-testid="select-filter-type">
+              <SelectValue placeholder="Filter by type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Images</SelectItem>
+              <SelectItem value="processed">Processed Images</SelectItem>
+              <SelectItem value="template">Template Images</SelectItem>
             </SelectContent>
           </Select>
           
@@ -637,8 +775,8 @@ export default function Gallery() {
           {previewImage && (
             <div className="space-y-4">
               <ImageComparisonSlider
-                beforeImage={previewImage.originalUrl}
-                afterImage={previewImage.processedUrl || previewImage.originalUrl}
+                beforeImage={previewImage.originalUrl || ''}
+                afterImage={previewImage.processedUrl || previewImage.originalUrl || ''}
                 beforeLabel="Original"
                 afterLabel="Processed"
               />

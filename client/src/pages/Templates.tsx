@@ -133,40 +133,53 @@ export default function Templates() {
               data-testid={`template-card-${template.id}`}
             >
               {/* Visual Preview */}
-              <div 
-                className="relative h-48 flex items-center justify-center overflow-hidden"
-                style={{
-                  background: template.settings?.gradientColors && template.settings.gradientColors.length > 1
-                    ? `linear-gradient(135deg, ${template.settings.gradientColors.join(', ')})`
-                    : template.backgroundStyle === 'velvet' 
-                      ? 'linear-gradient(135deg, #1a0a1f 0%, #3d1f4d 100%)'
-                      : template.backgroundStyle === 'marble'
-                        ? 'linear-gradient(135deg, #e0e0e0 0%, #f5f5f5 50%, #d0d0d0 100%)'
-                        : template.backgroundStyle === 'minimal'
-                          ? '#ffffff'
-                          : template.backgroundStyle === 'festive'
-                            ? 'linear-gradient(135deg, #ff6b6b 0%, #ffd93d 100%)'
-                            : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                }}
-              >
-                {/* Lighting Effect Overlay */}
-                <div 
-                  className="absolute inset-0"
-                  style={{
-                    background: template.lightingPreset === 'moody'
-                      ? 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.15) 0%, transparent 60%)'
-                      : template.lightingPreset === 'soft-glow'
-                        ? 'radial-gradient(circle at center, rgba(255,255,255,0.2) 0%, transparent 70%)'
-                        : template.lightingPreset === 'spotlight'
-                          ? 'radial-gradient(circle at 50% 20%, rgba(255,255,255,0.4) 0%, transparent 50%)'
-                          : 'linear-gradient(to bottom, rgba(255,255,255,0.1) 0%, transparent 100%)',
-                  }}
-                />
-                
-                {/* Product Placeholder */}
-                <div className="relative z-10 w-32 h-32 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center border border-white/30">
-                  <Sparkles className="h-12 w-12 text-white/80" />
-                </div>
+              <div className="relative h-48 flex items-center justify-center overflow-hidden">
+                {template.thumbnailUrl ? (
+                  // Display uploaded template image
+                  <img
+                    src={template.thumbnailUrl}
+                    alt={template.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  // Fallback to gradient background
+                  <>
+                    <div 
+                      className="absolute inset-0"
+                      style={{
+                        background: template.settings?.gradientColors && template.settings.gradientColors.length > 1
+                          ? `linear-gradient(135deg, ${template.settings.gradientColors.join(', ')})`
+                          : template.backgroundStyle === 'velvet' 
+                            ? 'linear-gradient(135deg, #1a0a1f 0%, #3d1f4d 100%)'
+                            : template.backgroundStyle === 'marble'
+                              ? 'linear-gradient(135deg, #e0e0e0 0%, #f5f5f5 50%, #d0d0d0 100%)'
+                              : template.backgroundStyle === 'minimal'
+                                ? '#ffffff'
+                                : template.backgroundStyle === 'festive'
+                                  ? 'linear-gradient(135deg, #ff6b6b 0%, #ffd93d 100%)'
+                                  : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                      }}
+                    />
+                    {/* Lighting Effect Overlay */}
+                    <div 
+                      className="absolute inset-0"
+                      style={{
+                        background: template.lightingPreset === 'moody'
+                          ? 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.15) 0%, transparent 60%)'
+                          : template.lightingPreset === 'soft-glow'
+                            ? 'radial-gradient(circle at center, rgba(255,255,255,0.2) 0%, transparent 70%)'
+                            : template.lightingPreset === 'spotlight'
+                              ? 'radial-gradient(circle at 50% 20%, rgba(255,255,255,0.4) 0%, transparent 50%)'
+                              : 'linear-gradient(to bottom, rgba(255,255,255,0.1) 0%, transparent 100%)',
+                      }}
+                    />
+                    
+                    {/* Product Placeholder */}
+                    <div className="relative z-10 w-32 h-32 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center border border-white/30">
+                      <Sparkles className="h-12 w-12 text-white/80" />
+                    </div>
+                  </>
+                )}
 
                 {/* Premium Badge */}
                 {template.isPremium && (

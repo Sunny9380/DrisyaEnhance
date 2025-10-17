@@ -47,6 +47,7 @@ export const templates = mysqlTable("templates", {
   whyBuy: text("why_buy"), // Compelling reason to choose this template
   testimonials: json("testimonials"), // Array: [{ name, role, content, avatarUrl, rating }]
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"), // Soft delete timestamp - NULL means not deleted
 });
 
 // Processing jobs table
@@ -134,6 +135,7 @@ export const coinPackages = mysqlTable("coin_packages", {
   priceInINR: int("price_in_inr").notNull(), // Price in Indian Rupees
   discount: int("discount").default(0), // Discount percentage (0-100)
   description: text("description"), // e.g., "Best value for regular users"
+  whatsappNumber: text("whatsapp_number"), // WhatsApp number for customer support
   isActive: boolean("is_active").notNull().default(true),
   displayOrder: int("display_order").notNull().default(0), // Sort order for display
   createdAt: timestamp("created_at").notNull().defaultNow(),
