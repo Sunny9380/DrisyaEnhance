@@ -1121,6 +1121,50 @@ function TemplateEditDialog({ template, open, onOpenChange }: {
               </div>
             </div>
 
+            {/* Template Image Upload */}
+            <div className="space-y-4">
+              <h3 className="font-semibold">Template Image</h3>
+              <div className="space-y-2">
+                <Label>Current Template Image</Label>
+                <div className="flex items-center gap-4">
+                  <div className="w-20 h-20 border rounded overflow-hidden bg-gray-50">
+                    {template.thumbnailUrl ? (
+                      <img
+                        src={template.thumbnailUrl}
+                        alt={template.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-400">
+                        <Image className="w-4 h-4" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleEditImageSelect}
+                      className="w-full p-2 border rounded"
+                      data-testid="input-edit-template-image"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Upload a new preview image for this template (JPG, PNG, WebP)
+                    </p>
+                  </div>
+                  {editImagePreview && (
+                    <div className="w-20 h-20 border rounded overflow-hidden">
+                      <img
+                        src={editImagePreview}
+                        alt="New template preview"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* Why Buy Section */}
             <div className="space-y-2">
               <Label htmlFor="whyBuy">Why Buy This Template</Label>

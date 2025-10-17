@@ -503,10 +503,6 @@ export default function Upload() {
       title: "Prompt Loaded",
       description: `Reusing: "${edit.prompt}"`,
     });
-    setAiEnhancementOpen(true);
-    setTimeout(() => {
-      document.querySelector('[data-testid="input-ai-prompt"]')?.scrollIntoView({ behavior: "smooth" });
-    }, 100);
   };
 
   const handleStartProcessing = async () => {
@@ -538,6 +534,43 @@ export default function Upload() {
 
     createJobMutation.mutate(formData);
   };
+
+  // Save images to gallery mutation
+  const saveToGalleryMutation = useMutation({
+    mutationFn: async (files: File[]) => {
+      const formData = new FormData();
+      files.forEach(file => {
+        formData.append('images', file);
+      });
+      
+      const res = await fetch("/api/gallery/upload-images", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || res.statusText);
+      }
+      
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/media"] });
+      toast({
+        title: "✅ Images saved to Gallery!",
+        description: `${data.totalCount} images are now available in your Media Gallery`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "⚠️ Gallery save failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleRemoveFile = (index: number) => {
     setFiles(prev => prev.filter((_, i) => i !== index));
@@ -635,47 +668,109 @@ export default function Upload() {
               <UploadDropzone
                 onFilesSelected={(selectedFiles) => {
                   setFiles(selectedFiles);
+                  // Automatically save to gallery when images are uploaded
+                  if (selectedFiles.length > 0) {
+                    saveToGalleryMutation.mutate(selectedFiles);
+                  }
                 }}
               />
 
               {files.length > 0 && (
                 <div className="space-y-4">
                   <Separator />
-                  <div className="space-y-2">
+                  <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-semibold">Uploaded Files</h4>
-                      <Badge variant="outline" data-testid="badge-estimated-time">
-                        <Zap className="w-3 h-3 mr-1" />
-                        ~{estimatedTimeMinutes} min processing time
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <ImageIcon className="w-5 h-5 text-primary" />
+                        <h4 className="text-lg font-semibold">Uploaded Images ({files.length})</h4>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" data-testid="badge-file-count">
+                          <Check className="w-3 h-3 mr-1" />
+                          {files.length} files ready
+                        </Badge>
+                        <Badge variant="outline" data-testid="badge-estimated-time">
+                          <Zap className="w-3 h-3 mr-1" />
+                          ~{estimatedTimeMinutes} min processing time
+                        </Badge>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                    
+                    {/* Enhanced Image Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
                       {files.map((file, index) => (
                         <div
                           key={index}
-                          className="relative group aspect-square bg-muted rounded-lg overflow-hidden border"
+                          className="relative group aspect-square bg-muted rounded-lg overflow-hidden border-2 border-border hover:border-primary transition-colors shadow-sm hover:shadow-md"
                           data-testid={`file-item-${index}`}
                         >
+                          {/* Image Preview */}
                           <img
                             src={filePreviewUrls[index]}
                             alt={file.name}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              const parent = target.parentElement;
+                              if (parent) {
+                                parent.innerHTML = `
+                                  <div class="w-full h-full flex flex-col items-center justify-center bg-muted text-muted-foreground">
+                                    <svg class="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                    <span class="text-xs">Preview Error</span>
+                                  </div>
+                                `;
+                              }
+                            }}
                           />
+                          
+                          {/* Success Indicator */}
+                          <div className="absolute top-2 right-2 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                            <Check className="w-3 h-3 text-white" />
+                          </div>
+                          
+                          {/* Remove Button Overlay */}
                           <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                             <Button
                               variant="destructive"
                               size="icon"
                               onClick={() => handleRemoveFile(index)}
                               data-testid={`button-remove-file-${index}`}
+                              className="shadow-lg"
                             >
                               <X className="w-4 h-4" />
                             </Button>
                           </div>
-                          <div className="absolute bottom-0 left-0 right-0 bg-black/80 p-1 text-xs text-white truncate">
-                            {file.name}
+                          
+                          {/* File Info */}
+                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                            <div className="text-xs text-white">
+                              <div className="font-medium truncate">{file.name}</div>
+                              <div className="text-white/70">
+                                {(file.size / 1024 / 1024).toFixed(1)} MB
+                              </div>
+                            </div>
                           </div>
                         </div>
                       ))}
+                    </div>
+                    
+                    {/* Bulk Actions */}
+                    <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                      <div className="text-sm text-muted-foreground">
+                        {files.length} image{files.length !== 1 ? 's' : ''} ready for processing
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setFiles([])}
+                        data-testid="button-clear-all"
+                      >
+                        <X className="w-4 h-4 mr-2" />
+                        Clear All
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -745,7 +840,7 @@ export default function Upload() {
               ) : (
                 <>
                   <TemplateGallery
-                    templates={templates}
+                    templates={templates as any}
                     selectedTemplateId={selectedTemplateId}
                     onTemplateSelect={handleTemplateSelect}
                   />
