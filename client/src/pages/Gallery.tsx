@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Grid as GridIcon, List, Download, Eye, RefreshCw, Plus, Image as ImageIcon, Check, X, Trash, Loader2, Archive, Upload } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -73,9 +73,21 @@ export default function Gallery() {
   const [reprocessTemplateId, setReprocessTemplateId] = useState<string>('');
 
   // Fetch all media (jobs + template images)
-  const { data: mediaData, isLoading } = useQuery<{ jobs: JobWithImages[]; templateImages: any[] }>({
+  const { data: mediaData, isLoading, error } = useQuery<{ jobs: JobWithImages[]; templateImages: any[] }>({
     queryKey: ["/api/media"],
+    retry: false,
   });
+
+  // Handle authentication errors
+  useEffect(() => {
+    if (error) {
+      console.error('Media fetch error:', error);
+      const errorMessage = error.message || '';
+      if (errorMessage.includes('401') || errorMessage.includes('Not authenticated')) {
+        setLocation('/login');
+      }
+    }
+  }, [error, setLocation]);
 
   const jobs = mediaData?.jobs || [];
   const templateImages = mediaData?.templateImages || [];

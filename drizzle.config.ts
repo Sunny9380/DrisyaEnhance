@@ -1,14 +1,17 @@
 import { defineConfig } from "drizzle-kit";
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL, ensure the database is provisioned");
-}
-
+// Enhanced config with better MySQL compatibility
 export default defineConfig({
   out: "./migrations",
   schema: "./shared/schema.ts",
   dialect: "mysql",
   dbCredentials: {
-    url: process.env.DATABASE_URL,
+    host: "localhost",
+    port: 3306,
+    user: "root",
+    password: "",
+    database: "drisya",
   },
+  verbose: true,
+  strict: false,
 });
