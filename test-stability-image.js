@@ -35,6 +35,7 @@ async function testStabilityImageToImage() {
 
     console.log('🔄 Sending request to Stability AI...');
     console.log(`📝 Prompt: ${PROMPT.substring(0, 100)}...`);
+    console.log(`📏 Image size: ${imageBuffer.length} bytes`);
     
     const formData = new FormData();
     formData.append('init_image', imageBuffer, 'earrings.jpg');
@@ -46,8 +47,7 @@ async function testStabilityImageToImage() {
     formData.append('samples', '1');
     formData.append('text_prompts[0][text]', PROMPT);
     formData.append('text_prompts[0][weight]', '1');
-    formData.append('width', '1024'); // Closest to 1080x1080
-    formData.append('height', '1024');
+    // Note: width/height cannot be set for image-to-image, output will match input dimensions
 
     const response = await axios.post(
       'https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/image-to-image',
