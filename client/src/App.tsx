@@ -35,6 +35,7 @@ import NotFound from "@/pages/NotFound";
 import NotificationCenter from "@/components/NotificationCenter";
 import KeyboardShortcuts from "@/components/KeyboardShortcuts";
 import Footer from "@/components/Footer";
+import ProtectedAdminRoute from "@/components/ProtectedAdminRoute";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -72,13 +73,33 @@ function AuthenticatedRouter() {
       <Route path="/media-library" component={MediaLibrary} />
       <Route path="/wallet" component={Wallet} />
       <Route path="/profile" component={Profile} />
-      <Route path="/analytics" component={Analytics} />
+      <Route path="/analytics">
+        <ProtectedAdminRoute>
+          <Analytics />
+        </ProtectedAdminRoute>
+      </Route>
       <Route path="/referrals" component={Referrals} />
       <Route path="/help" component={Help} />
-      <Route path="/team" component={Team} />
-      <Route path="/integrations" component={Integrations} />
-      <Route path="/api" component={APIAccess} />
-      <Route path="/admin" component={Admin} />
+      <Route path="/team">
+        <ProtectedAdminRoute>
+          <Team />
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/integrations">
+        <ProtectedAdminRoute>
+          <Integrations />
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/api">
+        <ProtectedAdminRoute>
+          <APIAccess />
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin">
+        <ProtectedAdminRoute>
+          <Admin />
+        </ProtectedAdminRoute>
+      </Route>
       <Route path="/showcase-3d" component={Showcase3D} />
       <Route path="/customize" component={CustomizeTemplate} />
       <Route path="/product-viewer" component={ProductViewer} />

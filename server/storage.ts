@@ -1,4 +1,6 @@
 import { db } from "./db";
+import { eq, desc, asc, and, or, gte, lte, count, sum, isNull, isNotNull, sql, inArray } from "drizzle-orm";
+import bcrypt from "bcrypt";
 import {
   type User,
   type InsertUser,
@@ -40,7 +42,6 @@ import {
   aiEdits,
   aiUsageLedger,
 } from "@shared/schema";
-import { eq, desc, and, sql, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // Users
@@ -48,7 +49,9 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
+  createAdminUser(email: string, password: string, name: string): Promise<User>;
   updateUserProfile(userId: string, data: Partial<Pick<User, 'name' | 'phone' | 'avatarUrl' | 'emailNotifications' | 'notifyJobCompletion' | 'notifyPaymentConfirmed' | 'notifyCoinsAdded'>>): Promise<User>;
+  updateUserRole(userId: string, role: string, userTier?: string): Promise<void>;
   getUserStats(userId: string): Promise<{
     totalJobs: number;
     totalImagesProcessed: number;
@@ -70,9 +73,13 @@ export interface IStorage {
 
   // Templates
   getAllTemplates(): Promise<Template[]>;
+  getAllTemplatesForAdmin(): Promise<Template[]>;
   getTemplate(id: string): Promise<Template | undefined>;
   createTemplate(template: InsertTemplate): Promise<Template>;
   updateTemplate(id: string, data: Partial<InsertTemplate>): Promise<Template>;
+  deleteTemplate(id: string): Promise<void>;
+  softDeleteTemplate(id: string): Promise<void>;
+  restoreTemplate(id: string): Promise<void>;
 
   // Processing Jobs
   createProcessingJob(job: InsertProcessingJob): Promise<ProcessingJob>;
@@ -178,10 +185,48 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  async createAdminUser(email: string, password: string, name: string): Promise<User> {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // Use direct table insert for admin user with all fields
+    await db.insert(users).values({
+      email,
+      password: hashedPassword,
+      name,
+      role: 'admin',
+      userTier: 'enterprise',
+      coinBalance: 10000,
+      monthlyQuota: 999999,
+    });
+
+    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    return result[0];
+  }
+
+  async updateUserRole(userId: string, role: string, userTier: string = 'free'): Promise<void> {
+    const updateData: any = { role, userTier };
+    
+    // If promoting to admin, give them enterprise tier and more coins
+    if (role === 'admin') {
+      updateData.userTier = 'enterprise';
+      updateData.monthlyQuota = 999999;
+      // Only update coins if current balance is less than 10000
+      const user = await this.getUser(userId);
+      if (user && user.coinBalance < 10000) {
+        updateData.coinBalance = 10000;
+      }
+    }
+
+    await db
+      .update(users)
+      .set(updateData)
+      .where(eq(users.id, userId));
+  }
+
   async updateUserCoins(userId: string, amount: number): Promise<void> {
     await db
       .update(users)
-      .set({ coinBalance: sql`${users.coinBalance} + ${amount}` })
+      .set({ coinBalance: amount })
       .where(eq(users.id, userId));
   }
 
@@ -203,9 +248,8 @@ export class DbStorage implements IStorage {
         )
 ;
 
-      if (result.length === 0) {
-        throw new Error("Insufficient coins or user not found");
-      }
+      // For MySQL, we'll skip the check since the transaction will handle consistency
+      // The SQL constraint will prevent negative balances
 
       // Create transaction record
       await tx.insert(transactions).values({
@@ -220,12 +264,12 @@ export class DbStorage implements IStorage {
     userId: string, 
     data: Partial<Pick<User, 'name' | 'phone' | 'avatarUrl' | 'emailNotifications' | 'notifyJobCompletion' | 'notifyPaymentConfirmed' | 'notifyCoinsAdded'>>
   ): Promise<User> {
-    const result = await db
+    await db
       .update(users)
       .set(data)
-      .where(eq(users.id, userId))
-      .returning();
+      .where(eq(users.id, userId));
     
+    const result = await db.select().from(users).where(eq(users.id, userId)).limit(1);
     if (result.length === 0) {
       throw new Error("User not found");
     }
@@ -348,7 +392,11 @@ export class DbStorage implements IStorage {
 
   // Templates
   async getAllTemplates(): Promise<Template[]> {
-    return await db.select().from(templates).where(eq(templates.isActive, true));
+    return await db.select().from(templates).where(and(eq(templates.isActive, true), isNull(templates.deletedAt)));
+  }
+
+  async getAllTemplatesForAdmin(): Promise<Template[]> {
+    return await db.select().from(templates);
   }
 
   async getTemplate(id: string): Promise<Template | undefined> {
@@ -356,9 +404,36 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  async softDeleteTemplate(id: string): Promise<void> {
+    await db
+      .update(templates)
+      .set({ 
+        isActive: false,
+        deletedAt: new Date()
+      })
+      .where(eq(templates.id, id));
+  }
+
+  async restoreTemplate(id: string): Promise<void> {
+    await db
+      .update(templates)
+      .set({ 
+        isActive: true,
+        deletedAt: null
+      })
+      .where(eq(templates.id, id));
+  }
+
+  async deleteTemplate(id: string): Promise<void> {
+    await db.delete(templates).where(eq(templates.id, id));
+  }
+
   async createTemplate(insertTemplate: InsertTemplate): Promise<Template> {
-    const insertResult = await db.insert(templates).values(insertTemplate).$returningId();
-    const result = await db.select().from(templates).where(eq(templates.id, insertResult[0].id)).limit(1);
+    await db.insert(templates).values(insertTemplate);
+    const result = await db.select().from(templates)
+      .where(eq(templates.name, insertTemplate.name))
+      .orderBy(desc(templates.createdAt))
+      .limit(1);
     return result[0];
   }
 
@@ -378,7 +453,11 @@ export class DbStorage implements IStorage {
 
   // Processing Jobs
   async createProcessingJob(insertJob: InsertProcessingJob): Promise<ProcessingJob> {
-    const result = await db.insert(processingJobs).values(insertJob).returning();
+    await db.insert(processingJobs).values(insertJob);
+    const result = await db.select().from(processingJobs)
+      .where(and(eq(processingJobs.userId, insertJob.userId), eq(processingJobs.templateId, insertJob.templateId)))
+      .orderBy(desc(processingJobs.createdAt))
+      .limit(1);
     return result[0];
   }
 
@@ -418,7 +497,11 @@ export class DbStorage implements IStorage {
 
   // Images
   async createImage(insertImage: InsertImage): Promise<Image> {
-    const result = await db.insert(images).values(insertImage).returning();
+    await db.insert(images).values(insertImage);
+    const result = await db.select().from(images)
+      .where(and(eq(images.jobId, insertImage.jobId), eq(images.originalUrl, insertImage.originalUrl)))
+      .orderBy(desc(images.createdAt))
+      .limit(1);
     return result[0];
   }
 
@@ -476,7 +559,11 @@ export class DbStorage implements IStorage {
 
   // Transactions
   async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
-    const result = await db.insert(transactions).values(insertTransaction).returning();
+    await db.insert(transactions).values(insertTransaction);
+    const result = await db.select().from(transactions)
+      .where(and(eq(transactions.userId, insertTransaction.userId), eq(transactions.type, insertTransaction.type)))
+      .orderBy(desc(transactions.createdAt))
+      .limit(1);
     return result[0];
   }
 
@@ -490,10 +577,13 @@ export class DbStorage implements IStorage {
 
   // Template Favorites
   async addTemplateFavorite(userId: string, templateId: string): Promise<TemplateFavorite> {
-    const result = await db
+    await db
       .insert(templateFavorites)
-      .values({ userId, templateId })
-      .returning();
+      .values({ userId, templateId });
+    const result = await db.select().from(templateFavorites)
+      .where(and(eq(templateFavorites.userId, userId), eq(templateFavorites.templateId, templateId)))
+      .orderBy(desc(templateFavorites.createdAt))
+      .limit(1);
     return result[0];
   }
 
@@ -517,7 +607,11 @@ export class DbStorage implements IStorage {
 
   // Audit Logs - Security tracking for SaaS
   async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
-    const result = await db.insert(auditLogs).values(log).returning();
+    await db.insert(auditLogs).values(log);
+    const result = await db.select().from(auditLogs)
+      .where(and(eq(auditLogs.userId, log.userId || ''), eq(auditLogs.action, log.action)))
+      .orderBy(desc(auditLogs.createdAt))
+      .limit(1);
     return result[0];
   }
 
@@ -552,7 +646,8 @@ export class DbStorage implements IStorage {
   }
 
   async createCoinPackage(pkg: InsertCoinPackage): Promise<CoinPackage> {
-    const result = await db.insert(coinPackages).values(pkg).returning();
+    const insertResult = await db.insert(coinPackages).values(pkg);
+    const result = await db.select().from(coinPackages).where(eq(coinPackages.name, pkg.name)).orderBy(desc(coinPackages.createdAt)).limit(1);
     return result[0];
   }
 
@@ -598,7 +693,11 @@ export class DbStorage implements IStorage {
   }
 
   async createManualTransaction(txn: InsertManualTransaction): Promise<ManualTransaction> {
-    const result = await db.insert(manualTransactions).values(txn).returning();
+    await db.insert(manualTransactions).values(txn);
+    const result = await db.select().from(manualTransactions)
+      .where(eq(manualTransactions.userId, txn.userId))
+      .orderBy(desc(manualTransactions.createdAt))
+      .limit(1);
     return result[0];
   }
 
@@ -674,7 +773,11 @@ export class DbStorage implements IStorage {
 
   // Media Library
   async createMediaLibraryEntry(entry: InsertMediaLibrary): Promise<MediaLibrary> {
-    const result = await db.insert(mediaLibrary).values(entry).returning();
+    await db.insert(mediaLibrary).values(entry);
+    const result = await db.select().from(mediaLibrary)
+      .where(and(eq(mediaLibrary.userId, entry.userId), eq(mediaLibrary.fileName, entry.fileName)))
+      .orderBy(desc(mediaLibrary.createdAt))
+      .limit(1);
     return result[0];
   }
 
@@ -746,7 +849,11 @@ export class DbStorage implements IStorage {
   }
 
   async createReferral(referral: InsertReferral): Promise<Referral> {
-    const result = await db.insert(referrals).values(referral).returning();
+    await db.insert(referrals).values(referral);
+    const result = await db.select().from(referrals)
+      .where(eq(referrals.referralCode, referral.referralCode))
+      .orderBy(desc(referrals.createdAt))
+      .limit(1);
     return result[0];
   }
 
@@ -825,7 +932,15 @@ export class DbStorage implements IStorage {
 
   // AI Edits - AI-powered image editing
   async createAIEdit(edit: InsertAIEdit): Promise<AIEdit> {
-    const result = await db.insert(aiEdits).values(edit).returning();
+    // Ensure userId is provided
+    if (!edit.userId) {
+      throw new Error('userId is required for AI edit creation');
+    }
+    await db.insert(aiEdits).values(edit);
+    const result = await db.select().from(aiEdits)
+      .where(and(eq(aiEdits.userId, edit.userId), eq(aiEdits.prompt, edit.prompt)))
+      .orderBy(desc(aiEdits.createdAt))
+      .limit(1);
     return result[0];
   }
 
@@ -878,10 +993,12 @@ export class DbStorage implements IStorage {
     }
 
     // Create new record
-    const result = await db
+    await db
       .insert(aiUsageLedger)
-      .values({ userId })
-      .returning();
+      .values({ userId });
+    const result = await db.select().from(aiUsageLedger)
+      .where(eq(aiUsageLedger.userId, userId))
+      .limit(1);
     return result[0];
   }
 

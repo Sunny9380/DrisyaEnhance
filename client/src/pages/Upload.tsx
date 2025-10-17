@@ -72,7 +72,6 @@ export default function Upload() {
   // Section collapse states
   const [uploadOpen, setUploadOpen] = useState(true);
   const [templateOpen, setTemplateOpen] = useState(false);
-  const [aiEnhancementOpen, setAiEnhancementOpen] = useState(false);
   const [processingOpen, setProcessingOpen] = useState(false);
   
   // Form state
@@ -123,6 +122,17 @@ export default function Upload() {
 
   const templates = templatesData?.templates || [];
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
+
+  // Auto-set AI prompt when template is selected
+  useEffect(() => {
+    if (selectedTemplate?.settings) {
+      const templateSettings = selectedTemplate.settings as any;
+      const templatePrompt = templateSettings?.diffusionPrompt || selectedTemplate.description;
+      if (templatePrompt) {
+        setAiPrompt(templatePrompt);
+      }
+    }
+  }, [selectedTemplate]);
 
   // Create preview URL for the first uploaded image
   const firstImagePreviewUrl = useMemo(() => {
@@ -859,264 +869,7 @@ export default function Upload() {
         </Card>
       </Collapsible>
 
-      {/* Section 3: AI Enhancement (Optional) */}
-      <Collapsible open={aiEnhancementOpen} onOpenChange={setAiEnhancementOpen}>
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between flex-wrap gap-4">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-muted-foreground font-semibold">
-                  3
-                </div>
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Wand2 className="w-5 h-5" />
-                    AI Enhancement (Optional)
-                  </CardTitle>
-                  <CardDescription>
-                    Advanced AI transformations for your images
-                  </CardDescription>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="outline">Optional</Badge>
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="icon" data-testid="button-toggle-ai-section">
-                    <ChevronDown className={`w-4 h-4 transition-transform ${aiEnhancementOpen ? '' : 'rotate-180'}`} />
-                  </Button>
-                </CollapsibleTrigger>
-              </div>
-            </div>
-          </CardHeader>
-          <CollapsibleContent>
-            <CardContent className="space-y-6">
-              {/* AI Editing Panel */}
-              {files.length > 0 && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-primary" />
-                    <h3 className="text-lg font-semibold">AI Image Editing (Beta)</h3>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-muted-foreground">
-                      Write a prompt to transform your images with AI
-                    </p>
-                    <Badge variant="secondary" className="gap-1">
-                      <Zap className="w-3 h-3" />
-                      Batch Mode: {files.length} {files.length === 1 ? 'image' : 'images'}
-                    </Badge>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="ai-prompt">Transformation Prompt (applies to all images)</Label>
-                    <Textarea
-                      id="ai-prompt"
-                      placeholder="Examples:
-- Change background to luxury marble with gold accents
-- Make it look like professional jewelry photography
-- Add sunset lighting and beach background"
-                      value={aiPrompt}
-                      onChange={(e) => setAiPrompt(e.target.value)}
-                      data-testid="input-ai-prompt"
-                      rows={4}
-                    />
-                    {selectedTemplate && (
-                      <div className="p-3 bg-primary/10 rounded-lg border border-primary/20">
-                        <p className="text-sm font-medium text-primary flex items-center gap-1">
-                          <Sparkles className="w-4 h-4" />
-                          Using "{selectedTemplate.name}" template for all images
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          All AI transformations will have the same {selectedTemplate.name} background style
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="ai-model">AI Model</Label>
-                    <Select value={aiModel} onValueChange={setAiModel}>
-                      <SelectTrigger id="ai-model" data-testid="select-ai-model">
-                        <SelectValue placeholder="Select AI model" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="auto">Auto (Best for your image)</SelectItem>
-                        <SelectItem value="qwen-2509">Qwen Edit (E-commerce)</SelectItem>
-                        <SelectItem value="flux-kontext">FLUX Kontext (Creative)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">AI Edit Quota</span>
-                      <span className="font-mono font-semibold">
-                        {quotaRemaining} of {quotaLimit} remaining
-                      </span>
-                    </div>
-                    <Progress value={(quotaUsed / quotaLimit) * 100} />
-                    <p className="text-xs text-muted-foreground">
-                      {quotaRemaining} free AI edits remaining this month
-                    </p>
-                  </div>
-
-                  <Button
-                    onClick={handleAIEdit}
-                    disabled={!aiPrompt.trim() || aiEditMutation.isPending || quotaRemaining <= 0 || files.length === 0}
-                    data-testid="button-ai-edit"
-                    className="w-full"
-                  >
-                    {files.length > 1 ? (
-                      <>
-                        <Zap className="w-4 h-4 mr-2" />
-                        {aiEditMutation.isPending ? `Processing ${files.length} images...` : `Transform ${files.length} Images (Batch Mode)`}
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-4 h-4 mr-2" />
-                        {aiEditMutation.isPending ? "Transforming..." : "Transform with AI"}
-                      </>
-                    )}
-                  </Button>
-                  
-                  {files.length > 1 && (
-                    <p className="text-xs text-muted-foreground text-center">
-                      ⚡ Fast batch processing: 20 images processed simultaneously
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* AI Edit History */}
-              {user && (
-                <>
-                  <Separator />
-                  <div className="space-y-4">
-                    <div className="space-y-3">
-                      <div>
-                        <h3 className="text-lg font-semibold">Your AI Edit History</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Recent AI transformations with before/after preview
-                        </p>
-                      </div>
-                      
-                      {selectedTemplate && (
-                        <div className="flex items-center gap-2 p-3 bg-primary/10 rounded-lg border border-primary/20">
-                          <Sparkles className="w-4 h-4 text-primary" />
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-primary">
-                              Active Template: {selectedTemplate.name}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              All AI transformations will use this template's background style
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    
-                    {editsLoading ? (
-                      <div className="flex items-center justify-center py-8">
-                        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                      </div>
-                    ) : edits?.length === 0 ? (
-                      <p className="text-sm text-muted-foreground py-4">
-                        No AI edits yet. Try transforming an image above!
-                      </p>
-                    ) : (
-                      <div className="space-y-3">
-                        {edits?.map((edit) => (
-                          <div
-                            key={edit.id}
-                            className="border rounded-lg overflow-hidden hover-elevate"
-                            data-testid={`ai-edit-history-item-${edit.id}`}
-                          >
-                            {/* Image Preview Section */}
-                            {edit.status === "completed" && edit.outputImageUrl && (
-                              <div className="grid grid-cols-2 gap-2 p-3 bg-muted/50">
-                                {/* Before Image */}
-                                <div className="space-y-1">
-                                  <p className="text-xs font-medium text-muted-foreground">Before</p>
-                                  <div className="aspect-square bg-background rounded-md overflow-hidden border">
-                                    <img
-                                      src={edit.inputImageUrl}
-                                      alt="Original"
-                                      className="w-full h-full object-cover"
-                                      data-testid={`img-before-${edit.id}`}
-                                    />
-                                  </div>
-                                </div>
-                                {/* After Image */}
-                                <div className="space-y-1">
-                                  <p className="text-xs font-medium text-muted-foreground">After</p>
-                                  <div className="aspect-square bg-background rounded-md overflow-hidden border">
-                                    <img
-                                      src={edit.outputImageUrl}
-                                      alt="AI Enhanced"
-                                      className="w-full h-full object-cover"
-                                      data-testid={`img-after-${edit.id}`}
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                            
-                            {/* Details Section */}
-                            <div className="p-3 space-y-2">
-                              <p className="text-sm font-medium">{edit.prompt}</p>
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  <Badge variant="outline">{edit.aiModel}</Badge>
-                                  <Badge variant="outline">{edit.quality || '4K'}</Badge>
-                                  <span>{formatDate(edit.createdAt)}</span>
-                                  <StatusBadge status={edit.status} />
-                                </div>
-                                
-                                {/* Action Buttons */}
-                                {edit.status === "completed" && edit.outputImageUrl && (
-                                  <div className="flex items-center gap-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => {
-                                        const link = document.createElement('a');
-                                        link.href = edit.outputImageUrl!;
-                                        link.download = `ai-edit-${edit.id}.png`;
-                                        link.click();
-                                      }}
-                                      data-testid={`button-download-${edit.id}`}
-                                    >
-                                      <Download className="w-4 h-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => {
-                                        if (edit.outputImageUrl) {
-                                          window.open(edit.outputImageUrl, "_blank");
-                                        }
-                                      }}
-                                      data-testid={`button-view-result-${edit.id}`}
-                                    >
-                                      <ExternalLink className="w-4 h-4" />
-                                    </Button>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </CollapsibleContent>
-        </Card>
-      </Collapsible>
-
-      {/* Section 4: Processing & Results */}
+      {/* Section 3: Processing & Results */}
       <Collapsible 
         open={processingOpen} 
         onOpenChange={setProcessingOpen}
@@ -1129,7 +882,7 @@ export default function Upload() {
                 <div className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold ${
                   files.length > 0 && selectedTemplateId ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
                 }`}>
-                  4
+                  3
                 </div>
                 <div>
                   <CardTitle className="flex items-center gap-2">

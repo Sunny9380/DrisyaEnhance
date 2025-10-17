@@ -12,6 +12,8 @@ import AdmZip from "adm-zip";
 import { insertUserSchema, insertProcessingJobSchema, insertCoinPackageSchema, insertManualTransactionSchema, insertMediaLibrarySchema, insertAIEditSchema } from "@shared/schema";
 import { sendWelcomeEmail, sendJobCompletedEmail, sendPaymentConfirmedEmail, sendCoinsAddedEmail, shouldSendEmail } from "./email";
 import { aiEditQueue } from "./queues/aiEditQueue";
+import { jewelryAIGenerator } from "./services/jewelryAIGenerator";
+import { z } from "zod";
 
 // Helper function to log audit events (IP tracking for SaaS security)
 async function logAudit(
@@ -218,6 +220,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cb(null, true);
       } else {
         cb(new Error("Only JPG and PNG images are allowed"));
+      }
+    },
+  });
+
+  // Configure multer for template thumbnail uploads
+  const templateUpload = multer({
+    dest: "uploads/templates/",
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+    fileFilter: (req, file, cb) => {
+      const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+      if (allowedTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error("Only JPG, PNG, and WebP images are allowed"));
       }
     },
   });
@@ -753,6 +769,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all templates for admin (including inactive ones)
+  app.get("/api/admin/templates", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const user = await storage.getUser(req.session.userId);
+      if (!user || user.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const templates = await storage.getAllTemplatesForAdmin();
+      res.json({ templates });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to fetch templates" });
+    }
+  });
+
   // Get user favorites
   app.get("/api/templates/favorites", async (req: Request, res: Response) => {
     if (!req.session.userId) {
@@ -862,6 +897,246 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid template data", errors: error.errors });
       }
       res.status(400).json({ message: error.message || "Failed to update template" });
+    }
+  });
+
+  // Create template (admin only)
+  app.post("/api/templates", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const user = await storage.getUser(req.session.userId);
+      if (!user || user.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const templateData = req.body;
+      const template = await storage.createTemplate(templateData);
+      res.json({ template });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message || "Failed to create template" });
+    }
+  });
+
+  // Upload template thumbnail (admin only)
+  app.post("/api/templates/:id/thumbnail", templateUpload.single("thumbnail"), async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const user = await storage.getUser(req.session.userId);
+      if (!user || user.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No image file provided" });
+      }
+
+      // Generate the thumbnail URL
+      const thumbnailUrl = `/uploads/templates/${req.file.filename}`;
+
+      // Update template with thumbnail URL
+      await storage.updateTemplate(req.params.id, { thumbnailUrl });
+
+      res.json({ 
+        success: true, 
+        message: "Template thumbnail uploaded successfully",
+        thumbnailUrl 
+      });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message || "Failed to upload template thumbnail" });
+    }
+  });
+
+  // Soft delete template (admin only)
+  app.patch("/api/templates/:id/soft-delete", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const user = await storage.getUser(req.session.userId);
+      if (!user || user.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      await storage.softDeleteTemplate(req.params.id);
+      res.json({ success: true, message: "Template soft deleted successfully" });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message || "Failed to soft delete template" });
+    }
+  });
+
+  // Restore template (admin only)
+  app.patch("/api/templates/:id/restore", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const user = await storage.getUser(req.session.userId);
+      if (!user || user.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      await storage.restoreTemplate(req.params.id);
+      res.json({ success: true, message: "Template restored successfully" });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message || "Failed to restore template" });
+    }
+  });
+
+  // Delete template (admin only) - Hard delete
+  app.delete("/api/templates/:id", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const user = await storage.getUser(req.session.userId);
+      if (!user || user.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      await storage.deleteTemplate(req.params.id);
+      res.json({ success: true, message: "Template permanently deleted" });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message || "Failed to delete template" });
+    }
+  });
+
+  // ============== User Management Routes (Admin Only) ==============
+
+  // Get all users (admin only)
+  app.get("/api/admin/users", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const user = await storage.getUser(req.session.userId);
+      if (!user || user.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const users = await storage.getAllUsers();
+      res.json({ users });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to fetch users" });
+    }
+  });
+
+  // Update user role (admin only)
+  app.patch("/api/admin/users/:id/role", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const user = await storage.getUser(req.session.userId);
+      if (!user || user.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { role, userTier } = req.body;
+      const targetUserId = req.params.id;
+
+      // Validate role
+      if (!['user', 'admin'].includes(role)) {
+        return res.status(400).json({ message: "Invalid role. Must be 'user' or 'admin'" });
+      }
+
+      // Validate user tier
+      if (userTier && !['free', 'premium', 'enterprise'].includes(userTier)) {
+        return res.status(400).json({ message: "Invalid user tier. Must be 'free', 'premium', or 'enterprise'" });
+      }
+
+      // Update user role and tier
+      await storage.updateUserRole(targetUserId, role, userTier || (role === 'admin' ? 'enterprise' : 'free'));
+
+      res.json({ success: true, message: "User role updated successfully" });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message || "Failed to update user role" });
+    }
+  });
+
+  // Update user coins (admin only)
+  app.patch("/api/admin/users/:id/coins", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const user = await storage.getUser(req.session.userId);
+      if (!user || user.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { coinBalance } = req.body;
+      const targetUserId = req.params.id;
+
+      if (typeof coinBalance !== 'number' || coinBalance < 0) {
+        return res.status(400).json({ message: "Invalid coin balance. Must be a non-negative number" });
+      }
+
+      await storage.updateUserCoins(targetUserId, coinBalance);
+
+      res.json({ success: true, message: "User coins updated successfully" });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message || "Failed to update user coins" });
+    }
+  });
+
+  // Create admin user (super admin only or if no admins exist)
+  app.post("/api/admin/create-admin", async (req: Request, res: Response) => {
+    try {
+      // Check if any admin users exist
+      const allUsers = await storage.getAllUsers();
+      const adminUsers = allUsers.filter(u => u.role === 'admin');
+
+      // If admins exist, require admin authentication
+      if (adminUsers.length > 0) {
+        if (!req.session.userId) {
+          return res.status(401).json({ message: "Not authenticated" });
+        }
+
+        const user = await storage.getUser(req.session.userId);
+        if (!user || user.role !== "admin") {
+          return res.status(403).json({ message: "Admin access required" });
+        }
+      }
+
+      const { email, password, name } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
+      }
+
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "User with this email already exists" });
+      }
+
+      // Create admin user
+      const newAdmin = await storage.createAdminUser(email, password, name || 'Admin User');
+
+      res.json({ 
+        success: true, 
+        message: "Admin user created successfully",
+        user: {
+          id: newAdmin.id,
+          email: newAdmin.email,
+          name: newAdmin.name,
+          role: newAdmin.role
+        }
+      });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message || "Failed to create admin user" });
     }
   });
 
@@ -1933,10 +2208,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("Failed to get AI usage:", error);
-      res.status(500).json({ message: error.message || "Failed to get AI usage" });
+      res.status(500).json({ message: error.message || "Failed to get usage info" });
     }
   });
 
-  const httpServer = createServer(app);
-  return httpServer;
+  // ============== Jewelry AI Generation Routes ==============
+
+  // Generate jewelry background using AI
+  app.post("/api/jewelry/generate", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { imageUrl, templateId, quality = '4k' } = req.body;
+
+      if (!imageUrl || !templateId) {
+        return res.status(400).json({ message: "Image URL and template ID are required" });
+      }
+
+      // Get template details
+      const template = await storage.getTemplate(templateId);
+      if (!template) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+
+      // Check if user has enough coins
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (user.coinBalance < template.coinCost) {
+        return res.status(400).json({ 
+          message: `Insufficient coins. Required: ${template.coinCost}, Available: ${user.coinBalance}` 
+        });
+      }
+
+      // Extract template prompt from settings
+      const templateSettings = template.settings as any;
+      const templatePrompt = templateSettings?.diffusionPrompt || template.description;
+
+      // Generate jewelry background
+      const result = await jewelryAIGenerator.generateJewelryBackground({
+        imageUrl,
+        templatePrompt,
+        templateName: template.name,
+        userId: req.session.userId,
+        quality,
+        outputSize: '1080x1080'
+      });
+
+      if (!result.success) {
+        return res.status(500).json({ 
+          message: "Failed to generate jewelry background",
+          error: result.error 
+        });
+      }
+
+      // Deduct coins from user (assuming updateUser method exists)
+      // await storage.updateUser(req.session.userId, { coinBalance: user.coinBalance - template.coinCost });
+
+      res.json({
+        success: true,
+        imageUrl: result.imageUrl,
+        templateName: template.name,
+        coinsUsed: template.coinCost,
+        remainingCoins: user.coinBalance - template.coinCost,
+        processingTime: result.processingTime,
+        usedFallback: result.usedFallback
+      });
+
+    } catch (error: any) {
+      console.error('Jewelry generation error:', error);
+      res.status(500).json({ message: error.message || "Failed to generate jewelry background" });
+    }
+  });
+
+  return server;
 }
