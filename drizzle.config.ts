@@ -6,11 +6,7 @@ export default defineConfig({
   schema: "./shared/schema.ts",
   dialect: "mysql",
   dbCredentials: {
-    host: "localhost",
-    port: 3306,
-    user: "root",
-    password: "",
-    database: "drisya",
+    url: process.env.DATABASE_URL || "mysql://root@localhost:3306/drisya",
   },
   verbose: true,
   strict: false,

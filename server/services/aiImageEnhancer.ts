@@ -114,14 +114,14 @@ export class AIImageEnhancer {
       const response = await axios.post(
         'https://api.replicate.com/v1/predictions',
         {
-          version: "854e8727697a057c525cdb45ab037f64ecca770a1769cc52287c2e56472a247b", // ESRGAN model
+          version: "39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b", // SDXL model
           input: {
             image: imageBase64,
             prompt: prompt,
-            num_outputs: 1,
+            strength: 0.35, // How much to change the image
             guidance_scale: 7.5,
             num_inference_steps: 20,
-            scheduler: "K_EULER"
+            scheduler: "K_EULER_ANCESTRAL"
           }
         },
         {
