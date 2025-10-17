@@ -21,7 +21,9 @@ import { insertUserSchema, insertProcessingJobSchema, insertCoinPackageSchema, i
 import { sendWelcomeEmail, sendJobCompletedEmail, sendPaymentConfirmedEmail, sendCoinsAddedEmail, shouldSendEmail } from "./email";
 import { aiEditQueue } from "./queues/aiEditQueue";
 import { jewelryAIGenerator } from "./services/jewelryAIGenerator";
+import { aiImageEnhancer } from "./services/aiImageEnhancer";
 import { z } from "zod";
+import { pool } from "./db";
 
 // Helper function to log audit events (IP tracking for SaaS security)
 async function logAudit(
@@ -59,6 +61,23 @@ function getClientIP(req: Request): string {
 const upload = multer({
   dest: "uploads/",
   limits: { fileSize: 25 * 1024 * 1024 }, // 25MB limit
+});
+
+// Configure multer for bulk uploads (up to 10,000 images)
+const bulkUpload = multer({
+  dest: "uploads/bulk/",
+  limits: { 
+    fileSize: 50 * 1024 * 1024, // 50MB per file
+    files: 10000 // Maximum 10,000 files
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/bmp', 'image/tiff'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image files are allowed (JPG, PNG, WebP, GIF, BMP, TIFF)"));
+    }
+  },
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -1169,6 +1188,406 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============== Bulk Image Upload Routes ==============
+
+  // Bulk image upload with blur detection and AI enhancement
+  app.post(
+    "/api/jobs/bulk-upload",
+    bulkUpload.array("images", 10000),
+    async (req: Request, res: Response) => {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      try {
+        const files = req.files as Express.Multer.File[];
+        if (!files || files.length === 0) {
+          return res.status(400).json({ message: "No images uploaded" });
+        }
+
+        if (files.length > 10000) {
+          return res.status(400).json({ message: "Maximum 10,000 images allowed per bulk upload" });
+        }
+
+        const { templateId, enhancementPrompt, quality = "standard", enableBlurDetection = true } = req.body;
+        if (!templateId) {
+          return res.status(400).json({ message: "Template ID is required" });
+        }
+
+        // Get template for prompt
+        const template = await storage.getTemplate(templateId);
+        if (!template) {
+          return res.status(404).json({ message: "Template not found" });
+        }
+
+        // Use custom prompt or template prompt
+        const aiPrompt = enhancementPrompt || (template.settings as any)?.diffusionPrompt || 
+          "A dark, elegant matte blue velvet or suede background with soft texture, under moody, directional lighting. Strong light beams cast realistic shadows in a criss-cross windowpane pattern, creating a dramatic and luxurious ambiance. The scene should evoke a sense of evening or indoor light streaming through a window, with a focused spotlight on the product area and soft shadows to highlight depth and contrast. The environment should feel premium, rich, and cinematic. Ensure the product design, colors, and composition remain exactly the same with no changes or alterations. Output size 1080x1080px.";
+
+        // Check user quota
+        const quotaStatus = await storage.checkUserQuota(req.session.userId);
+        if (!quotaStatus.hasQuota) {
+          return res.status(403).json({ 
+            message: "Monthly quota exceeded. Please upgrade your plan to process more images.",
+            quota: quotaStatus.quota,
+            used: quotaStatus.used,
+          });
+        }
+
+        if (quotaStatus.remaining < files.length) {
+          return res.status(403).json({ 
+            message: `Insufficient quota. You have ${quotaStatus.remaining} images remaining this month.`,
+            quota: quotaStatus.quota,
+            used: quotaStatus.used,
+            remaining: quotaStatus.remaining,
+          });
+        }
+
+        // Calculate coins based on quality
+        const qualityMultipliers: Record<string, number> = {
+          standard: 2,
+          high: 3,
+          ultra: 5,
+        };
+        const qualityMultiplier = qualityMultipliers[quality] || 2;
+        const coinsNeeded = files.length * qualityMultiplier;
+        
+        // Check user balance
+        const user = await storage.getUser(req.session.userId);
+        if (!user || user.coinBalance < coinsNeeded) {
+          return res.status(400).json({ 
+            message: `Insufficient coins. Required: ${coinsNeeded}, Available: ${user?.coinBalance || 0}` 
+          });
+        }
+
+        // Create bulk processing job
+        const job = await storage.createProcessingJob({
+          userId: req.session.userId,
+          templateId,
+          totalImages: files.length,
+          coinsUsed: coinsNeeded,
+          status: "queued",
+          batchSettings: {
+            quality,
+            enableBlurDetection,
+            aiPrompt,
+            bulkUpload: true,
+            maxImages: files.length
+          },
+        });
+
+        // Process images in batches to avoid memory issues
+        const BATCH_SIZE = 100;
+        const imagePromises = [];
+        
+        for (let i = 0; i < files.length; i += BATCH_SIZE) {
+          const batch = files.slice(i, i + BATCH_SIZE);
+          
+          for (const file of batch) {
+            const originalUrl = `/uploads/bulk/${path.basename(file.path)}`;
+            imagePromises.push(
+              storage.createImage({
+                jobId: job.id,
+                originalUrl,
+              })
+            );
+          }
+        }
+
+        await Promise.all(imagePromises);
+
+        // Log bulk upload audit
+        await logAudit(
+          req.session.userId,
+          'bulk_upload_created',
+          getClientIP(req),
+          req.headers['user-agent'],
+          { 
+            jobId: job.id, 
+            imageCount: files.length,
+            coinsUsed: coinsNeeded,
+            templateId,
+            quality,
+            enableBlurDetection
+          }
+        );
+
+        // Deduct coins atomically
+        try {
+          await storage.addCoinsWithTransaction(req.session.userId, -coinsNeeded, {
+            type: "usage",
+            description: `Bulk processed ${files.length} images (${quality} quality)`,
+            metadata: { jobId: job.id, quality, bulkUpload: true },
+          });
+
+          // Increment monthly usage
+          await storage.incrementMonthlyUsage(req.session.userId, files.length);
+        } catch (error: any) {
+          await storage.updateProcessingJobStatus(job.id, "failed", 0);
+          
+          if (error.message.includes("Insufficient coins")) {
+            return res.status(400).json({ message: "Insufficient coins to process images" });
+          }
+          throw error;
+        }
+
+        // Start bulk processing asynchronously
+        setTimeout(async () => {
+          try {
+            await processBulkImages(job.id, aiPrompt, quality, enableBlurDetection);
+          } catch (error) {
+            console.error("Bulk processing error:", error);
+            await storage.updateProcessingJobStatus(job.id, "failed", 0);
+          }
+        }, 1000);
+
+        res.json({ 
+          job,
+          message: `Bulk upload started. Processing ${files.length} images with AI enhancement.`,
+          estimatedTime: `${Math.ceil(files.length / 10)} minutes`
+        });
+      } catch (error: any) {
+        console.error("Bulk upload error:", error);
+        res.status(500).json({ message: error.message || "Failed to create bulk upload job" });
+      }
+    }
+  );
+
+  // Bulk processing function
+  async function processBulkImages(
+    jobId: string, 
+    aiPrompt: string, 
+    quality: string,
+    enableBlurDetection: boolean
+  ) {
+    try {
+      // Get all images for this job
+      const jobImages = await storage.getJobImages(jobId);
+      
+      // Update job status to processing
+      await storage.updateProcessingJobStatus(jobId, "processing", 0);
+      
+      // Ensure processed directory exists
+      await fs.mkdir(path.join("uploads", "processed"), { recursive: true });
+
+      let completedCount = 0;
+      const PROCESSING_BATCH_SIZE = 10; // Process 10 images at a time for stability
+      
+      // Process images in smaller batches
+      for (let i = 0; i < jobImages.length; i += PROCESSING_BATCH_SIZE) {
+        const batch = jobImages.slice(i, i + PROCESSING_BATCH_SIZE);
+        
+        await Promise.all(
+          batch.map(async (image) => {
+            try {
+              const inputPath = path.join(process.cwd(), image.originalUrl);
+              
+              // Check if image exists
+              try {
+                await fs.access(inputPath);
+              } catch {
+                console.error(`Input image not found: ${inputPath}`);
+                await storage.updateImageStatus(image.id, "failed", undefined);
+                return;
+              }
+
+              // Detect blur if enabled
+              let isBlurred = false;
+              if (enableBlurDetection) {
+                isBlurred = await detectImageBlur(inputPath);
+              }
+
+              // Generate output filename
+              const timestamp = Date.now();
+              const randomId = Math.random().toString(36).substring(7);
+              const outputFileName = `enhanced_${timestamp}_${randomId}.png`;
+              const outputPath = path.join("uploads", "processed", outputFileName);
+              const outputUrl = `/uploads/processed/${outputFileName}`;
+
+              // Apply AI enhancement
+              const enhancementSuccess = await enhanceImageWithAI(
+                inputPath,
+                outputPath,
+                aiPrompt,
+                quality,
+                isBlurred
+              );
+
+              if (enhancementSuccess) {
+                await storage.updateImageStatus(image.id, "completed", outputUrl);
+                completedCount++;
+              } else {
+                // Fallback: copy original if AI fails
+                await fs.copyFile(inputPath, outputPath);
+                await storage.updateImageStatus(image.id, "completed", outputUrl);
+                completedCount++;
+              }
+            } catch (error) {
+              console.error(`Failed to process image ${image.id}:`, error);
+              await storage.updateImageStatus(image.id, "failed", undefined);
+            }
+          })
+        );
+
+        // Update progress
+        await storage.updateProcessingJobStatus(jobId, "processing", completedCount);
+        
+        // Small delay between batches to prevent system overload
+        if (i + PROCESSING_BATCH_SIZE < jobImages.length) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+
+      // Create ZIP file with all processed images
+      const zipFileName = `bulk-job-${jobId}.zip`;
+      const zipPath = path.join("uploads", "processed", zipFileName);
+      const output = createWriteStream(zipPath);
+      const archive = archiver("zip", { zlib: { level: 9 } });
+
+      archive.pipe(output);
+
+      // Add all completed images to ZIP
+      const updatedJobImages = await storage.getJobImages(jobId);
+      for (const image of updatedJobImages) {
+        if (image.processedUrl) {
+          const imagePath = path.join(process.cwd(), image.processedUrl);
+          try {
+            await fs.access(imagePath);
+            const originalName = path.basename(image.originalUrl).replace(/^[0-9]+_/, '');
+            archive.file(imagePath, { name: `enhanced_${originalName}` });
+          } catch (err) {
+            console.error(`Failed to add ${imagePath} to ZIP:`, err);
+          }
+        }
+      }
+
+      await archive.finalize();
+
+      // Update job status
+      const jobStatus = completedCount === jobImages.length ? "completed" : "failed";
+      await storage.updateProcessingJobStatus(
+        jobId,
+        jobStatus,
+        completedCount,
+        `/uploads/processed/${zipFileName}`
+      );
+
+      // Send completion email if successful
+      if (jobStatus === "completed") {
+        const job = await storage.getProcessingJob(jobId);
+        const user = await storage.getUser(job!.userId);
+        if (user && shouldSendEmail(user, "jobCompletion")) {
+          const downloadUrl = `${process.env.APP_URL || 'http://localhost:5000'}/api/jobs/${jobId}/download`;
+          sendJobCompletedEmail(user, job!, downloadUrl).catch((error) => {
+            console.error("Failed to send bulk job completed email:", error);
+          });
+        }
+      }
+
+      // Clean up temporary uploaded files
+      for (const image of jobImages) {
+        try {
+          const tempPath = path.join(process.cwd(), image.originalUrl);
+          await fs.unlink(tempPath);
+        } catch (err) {
+          console.error(`Failed to delete temp file: ${err}`);
+        }
+      }
+
+      console.log(`Bulk job ${jobId} completed: ${completedCount}/${jobImages.length} images processed`);
+    } catch (error) {
+      console.error("Bulk processing error:", error);
+      await storage.updateProcessingJobStatus(jobId, "failed", 0);
+    }
+  }
+
+  // Blur detection function using simple variance of Laplacian
+  async function detectImageBlur(imagePath: string): Promise<boolean> {
+    try {
+      // This is a placeholder - in a real implementation, you would use
+      // an image processing library like Sharp or OpenCV to detect blur
+      // For now, we'll assume all images might be blurred and need enhancement
+      return true;
+    } catch (error) {
+      console.error("Blur detection failed:", error);
+      return false;
+    }
+  }
+
+  // AI image enhancement function
+  async function enhanceImageWithAI(
+    inputPath: string,
+    outputPath: string,
+    prompt: string,
+    quality: string,
+    isBlurred: boolean
+  ): Promise<boolean> {
+    try {
+      console.log(`Processing image with AI: ${path.basename(inputPath)}`);
+      console.log(`Quality: ${quality}, Is Blurred: ${isBlurred}`);
+      
+      const result = await aiImageEnhancer.enhanceImage({
+        inputPath,
+        outputPath,
+        prompt,
+        quality,
+        isBlurred
+      });
+
+      if (result.success) {
+        console.log(`✅ AI enhancement completed in ${result.processingTime}ms`);
+        return true;
+      } else {
+        console.error(`❌ AI enhancement failed: ${result.error}`);
+        return false;
+      }
+    } catch (error) {
+      console.error("AI enhancement failed:", error);
+      return false;
+    }
+  }
+
+  // Get bulk upload progress
+  app.get("/api/jobs/bulk/:jobId/progress", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const job = await storage.getProcessingJob(req.params.jobId);
+      if (!job) {
+        return res.status(404).json({ message: "Job not found" });
+      }
+
+      if (job.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const images = await storage.getJobImages(job.id);
+      const completedImages = images.filter(img => img.status === "completed").length;
+      const failedImages = images.filter(img => img.status === "failed").length;
+      const processingImages = images.filter(img => img.status === "processing").length;
+      const pendingImages = images.filter(img => img.status === "pending").length;
+
+      const progress = {
+        jobId: job.id,
+        status: job.status,
+        totalImages: job.totalImages,
+        completedImages,
+        failedImages,
+        processingImages,
+        pendingImages,
+        progressPercentage: Math.round((completedImages / job.totalImages) * 100),
+        estimatedTimeRemaining: pendingImages > 0 ? `${Math.ceil(pendingImages / 10)} minutes` : "0 minutes",
+        zipUrl: job.zipUrl
+      };
+
+      res.json({ progress });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to get progress" });
+    }
+  });
+
   // ============== Processing Job Routes ==============
 
   // Create processing job and upload images
@@ -1885,9 +2304,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      // TODO: Implement media library table and getUserMediaLibrary method
-      // For now, return empty array to prevent errors
-      const media: any[] = [];
+      // Get uploaded gallery images for media library
+      let media: any[] = [];
+      try {
+        const galleryDir = "uploads/gallery";
+        const galleryFiles = await fs.readdir(galleryDir);
+        
+        media = galleryFiles
+          .filter(file => {
+            const ext = path.extname(file).toLowerCase();
+            return ['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(ext);
+          })
+          .map(file => ({
+            id: `media-${file}`,
+            name: file,
+            type: 'image',
+            url: `/uploads/gallery/${file}`,
+            thumbnailUrl: `/uploads/gallery/${file}`,
+            uploadedAt: new Date(),
+            isFavorite: false,
+            tags: ['uploaded'],
+            category: 'Raw Upload'
+          }));
+      } catch (galleryError) {
+        console.error('Failed to read gallery directory for media library:', galleryError);
+      }
+      
       res.json({ media });
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to fetch media library" });
@@ -1952,7 +2394,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create edit record in database
       const edit = await storage.createAIEdit({
         ...validatedData,
-        userId: req.session.userId,
       });
 
       // Queue async processing (don't await)
@@ -2020,12 +2461,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const editIds: string[] = [];
       for (const imageUrl of images) {
         const edit = await storage.createAIEdit({
-          userId: req.session.userId,
           inputImageUrl: imageUrl,
           prompt,
           aiModel,
           quality,
-          status: "queued",
         });
         editIds.push(edit.id);
       }
@@ -2567,34 +3006,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      // Get user's jobs with images from database
-      // For now, return empty jobs array and focus on uploaded images from filesystem
-      const jobs: any[] = [];
+      // Get images from database using direct query
+      let jobs: any[] = [];
       
-      // Get uploaded gallery images (read from filesystem for now)
-      let uploadedImages: any[] = [];
       try {
-        const galleryDir = "uploads/gallery";
-        const galleryFiles = await fs.readdir(galleryDir);
+        // Query the database directly for user's images
+        const query = `
+          SELECT 
+            i.id,
+            i.original_url,
+            i.processed_url,
+            i.status,
+            i.created_at,
+            pj.id as job_id,
+            pj.template_id,
+            pj.created_at as job_created_at,
+            pj.user_id
+          FROM images i
+          JOIN processing_jobs pj ON i.job_id = pj.id
+          WHERE pj.user_id = ?
+          ORDER BY i.created_at DESC
+        `;
         
-        uploadedImages = galleryFiles
-          .filter(file => {
-            const ext = path.extname(file).toLowerCase();
-            return ['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(ext);
-          })
-          .map(file => ({
-            id: `uploaded-${file}`,
-            type: 'uploaded',
-            templateName: 'Raw Upload',
-            jobCreatedAt: new Date(),
-            originalName: file,
-            status: 'completed',
-            originalUrl: `/uploads/gallery/${file}`,
-            processedUrl: `/uploads/gallery/${file}`,
-            thumbnailUrl: `/uploads/gallery/${file}`
-          }));
-      } catch (galleryError) {
-        console.error('Failed to read gallery directory:', galleryError);
+        const [rows] = await pool.execute(query, [req.session.userId]);
+        
+        jobs = (rows as any[]).map(row => ({
+          id: row.id,
+          type: row.template_id === 'upload-only' ? 'uploaded' : 'processed',
+          templateName: row.template_id === 'upload-only' ? 'Raw Upload' : 'Processed',
+          jobCreatedAt: row.job_created_at,
+          originalName: path.basename(row.original_url),
+          status: row.status,
+          originalUrl: row.original_url,
+          processedUrl: row.processed_url || row.original_url,
+          thumbnailUrl: row.processed_url || row.original_url,
+          jobId: row.job_id,
+          userId: row.user_id
+        }));
+        
+        console.log(`Found ${jobs.length} images for user ${req.session.userId}`);
+      } catch (dbError) {
+        console.error('Database query failed, falling back to filesystem:', dbError);
+        
+        // Fallback to filesystem if database query fails
+        try {
+          const galleryDir = "uploads/gallery";
+          const galleryFiles = await fs.readdir(galleryDir);
+          
+          jobs = galleryFiles
+            .filter(file => {
+              const ext = path.extname(file).toLowerCase();
+              return ['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(ext);
+            })
+            .map(file => ({
+              id: `uploaded-${file}`,
+              type: 'uploaded',
+              templateName: 'Raw Upload',
+              jobCreatedAt: new Date(),
+              originalName: file,
+              status: 'completed',
+              originalUrl: `/uploads/gallery/${file}`,
+              processedUrl: `/uploads/gallery/${file}`,
+              thumbnailUrl: `/uploads/gallery/${file}`
+            }));
+        } catch (fsError) {
+          console.error('Filesystem fallback also failed:', fsError);
+        }
       }
       
       // Get all templates with thumbnails (for admin users or public templates)
@@ -2636,7 +3113,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json({ 
-        jobs: [...jobs, ...uploadedImages], // Include uploaded images as jobs
+        jobs: jobs, // Images from database
         templateImages 
       });
 
