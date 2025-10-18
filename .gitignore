@@ -1,16 +1,218 @@
-node_modules
-dist
-.DS_Store
-server/public
-vite.config.ts.*
-*.tar.gz
+# =============================================================================
+# DRISYA ENHANCE - COMPREHENSIVE .GITIGNORE
+# =============================================================================
 
-# Environment files
+# -----------------------------------------------------------------------------
+# ENVIRONMENT & SECRETS (CRITICAL - NEVER COMMIT THESE)
+# -----------------------------------------------------------------------------
 .env
 .env.local
 .env.production
 .env.staging
+.env.development
+.env.test
 
 # API Keys and Secrets
 *.key
 *.pem
+*.p12
+*.pfx
+config/secrets.json
+secrets/
+credentials/
+
+# -----------------------------------------------------------------------------
+# NODE.JS & NPM
+# -----------------------------------------------------------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# -----------------------------------------------------------------------------
+# BUILD OUTPUTS & DISTRIBUTION
+# -----------------------------------------------------------------------------
+dist/
+build/
+out/
+.next/
+.nuxt/
+.cache/
+.parcel-cache/
+.vite/
+
+# Compiled binary addons
+build/Release
+
+# -----------------------------------------------------------------------------
+# DEVELOPMENT TOOLS & IDEs
+# -----------------------------------------------------------------------------
+# VSCode
+.vscode/
+*.code-workspace
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+
+# -----------------------------------------------------------------------------
+# OPERATING SYSTEM FILES
+# -----------------------------------------------------------------------------
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Icon?
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+
+# -----------------------------------------------------------------------------
+# LOGS & TEMPORARY FILES
+# -----------------------------------------------------------------------------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Temporary folders
+tmp/
+temp/
+.tmp/
+.temp/
+
+# -----------------------------------------------------------------------------
+# DATABASE & UPLOADS (SENSITIVE DATA)
+# -----------------------------------------------------------------------------
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# Upload directories with user content
+uploads/processed/
+uploads/ai-generated/
+uploads/avatars/
+uploads/bulk/
+uploads/extracted/
+uploads/media/
+
+# Keep upload structure but ignore content
+!uploads/.gitkeep
+!uploads/processed/.gitkeep
+!uploads/ai-generated/.gitkeep
+
+# -----------------------------------------------------------------------------
+# PROJECT SPECIFIC
+# -----------------------------------------------------------------------------
+# Server public assets (generated)
+server/public/
+
+# Vite config variations
+vite.config.ts.*
+
+# Test files and reports
+test-results/
+coverage/
+*.test.js.snap
+api-test-report.json
+environment-test-report.json
+
+# Generated images and test files
+test-*.jpg
+test-*.png
+test-*.jpeg
+gpt-image-1-*.png
+dalle3-test-*.png
+enhanced-*.jpg
+enhanced-*.png
+
+# Batch files (often contain sensitive commands)
+*.bat
+
+# -----------------------------------------------------------------------------
+# PACKAGE MANAGERS & DEPENDENCIES
+# -----------------------------------------------------------------------------
+# npm
+package-lock.json
+npm-shrinkwrap.json
+
+# Yarn
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# pnpm
+.pnpm-store/
+
+# -----------------------------------------------------------------------------
+# MISC
+# -----------------------------------------------------------------------------
+# Archive files
+*.tar.gz
+*.zip
+*.rar
+*.7z
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# =============================================================================
