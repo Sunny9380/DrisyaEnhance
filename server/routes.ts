@@ -22,6 +22,8 @@ import { sendWelcomeEmail, sendJobCompletedEmail, sendPaymentConfirmedEmail, sen
 import { aiEditQueue } from "./queues/aiEditQueue";
 import { jewelryAIGenerator } from "./services/jewelryAIGenerator";
 import { aiImageEnhancer } from "./services/aiImageEnhancer";
+import { openaiImageEnhancer } from "./services/openaiImageEnhancer";
+import { registerOpenAIRoutes } from "./routes/openaiRoutes";
 import { z } from "zod";
 import { pool } from "./db";
 
@@ -3121,6 +3123,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: error.message || "Failed to get media" });
     }
   });
+
+  // ============== Register OpenAI Routes ==============
+  registerOpenAIRoutes(app);
 
   return createServer(app);
 }
