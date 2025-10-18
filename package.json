@@ -17,6 +17,8 @@
     "db:schema": "node fix-database-schema.js",
     "test:api": "node test-api.js",
     "test:all-apis": "node test-all-apis.js",
+    "test:earrings": "node test-earrings-enhancement.js",
+    "convert:image": "node convert-image.js",
     "test:all": "npm run db:setup && npm run test:api",
     "fix:all": "npm run db:setup && npm run build && npm run test:api",
     "quick:test": "npm run build && npm run test:api"
@@ -96,6 +98,7 @@
     "react-icons": "^5.4.0",
     "react-resizable-panels": "^2.1.7",
     "recharts": "^2.15.2",
+    "sharp": "^0.34.4",
     "stripe": "^19.1.0",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
