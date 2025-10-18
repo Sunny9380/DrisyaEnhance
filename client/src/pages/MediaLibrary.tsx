@@ -77,8 +77,8 @@ export default function MediaLibrary() {
   };
 
   const filteredMedia = data?.media?.filter((item) => {
-    const matchesSearch = item.fileName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.templateUsed?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = (item.fileName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.templateUsed || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesFavorite = !filterFavorites || item.isFavorite;
     return matchesSearch && matchesFavorite;
   }).sort((a, b) => {

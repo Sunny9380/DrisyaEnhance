@@ -21,7 +21,11 @@ import { insertUserSchema, insertProcessingJobSchema, insertCoinPackageSchema, i
 import { sendWelcomeEmail, sendJobCompletedEmail, sendPaymentConfirmedEmail, sendCoinsAddedEmail, shouldSendEmail } from "./email";
 import { aiEditQueue } from "./queues/aiEditQueue";
 import { jewelryAIGenerator } from "./services/jewelryAIGenerator";
-import { aiImageEnhancer } from "./services/aiImageEnhancer";
+// OpenAI-only system - removed Stability AI
+import { openaiImageEnhancer } from "./services/openaiImageEnhancer";
+import { registerOpenAIRoutes } from "./routes/openaiRoutes";
+// Template AI Enhancement System
+import { registerTemplateAIRoutes } from "./routes/templateAIRoutes";
 import { z } from "zod";
 import { pool } from "./db";
 
@@ -1741,11 +1745,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 batch.map(async (image) => {
                   try {
                     // AI processing functionality has been removed
-                    await storage.updateImageStatus(image.id, "failed", null);
+                    await storage.updateImageStatus(image.id, "failed", undefined);
                     throw new Error("AI image processing functionality has been removed");
                   } catch (error) {
                     console.error(`Failed to process image ${image.id}:`, error);
-                    await storage.updateImageStatus(image.id, "failed", null);
+                    await storage.updateImageStatus(image.id, "failed", undefined);
                   }
                 })
               );
@@ -2018,11 +2022,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Calculate coin cost based on quality multiplier (same as upload flow)
-      const qualityMultiplier = {
+      const qualityMultipliers: Record<string, number> = {
         standard: 2,
         high: 3,
         ultra: 5,
-      }[quality || "standard"] || 2;
+      };
+      const qualityMultiplier = qualityMultipliers[quality || "standard"] || 2;
       
       const coinCost = images.length * qualityMultiplier;
 
@@ -2067,14 +2072,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const jobImages = await storage.getJobImages(job.id);
           
           // Prepare template settings for Python AI service
+          const settings = template.settings as any || {};
           const templateSettings = {
             backgroundStyle: template.backgroundStyle || 'gradient',
             lightingPreset: template.lightingPreset || 'soft-glow',
-            shadowIntensity: template.settings?.shadowIntensity || 0,
-            vignetteStrength: template.settings?.vignetteStrength || 0,
-            colorGrading: template.settings?.colorGrading || 'neutral',
-            gradientColors: template.settings?.gradientColors || ['#0F2027', '#203A43'],
-            diffusionPrompt: template.settings?.diffusionPrompt || '',
+            shadowIntensity: settings.shadowIntensity || 0,
+            vignetteStrength: settings.vignetteStrength || 0,
+            colorGrading: settings.colorGrading || 'neutral',
+            gradientColors: settings.gradientColors || ['#0F2027', '#203A43'],
+            diffusionPrompt: settings.diffusionPrompt || '',
           };
           
           // Ensure processed directory exists
@@ -2091,11 +2097,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               batch.map(async (image) => {
                 try {
                   // AI processing functionality has been removed
-                  await storage.updateImageStatus(image.id, "failed", null);
+                  await storage.updateImageStatus(image.id, "failed", undefined);
                   throw new Error("AI image processing functionality has been removed");
                 } catch (error) {
                   console.error(`Failed to process image ${image.id}:`, error);
-                  await storage.updateImageStatus(image.id, "failed", null);
+                  await storage.updateImageStatus(image.id, "failed", undefined);
                 }
               })
             );
@@ -2123,10 +2129,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
             
             await archive.finalize();
-            await storage.updateProcessingJob(job.id, {
-              zipUrl: `/uploads/processed/${zipFileName}`,
-              completedAt: new Date(),
-            });
+            await storage.updateProcessingJobStatus(job.id, "completed", completedCount, `/uploads/processed/${zipFileName}`);
           }
 
           console.log(`Bulk reprocess job ${job.id} completed with ${completedCount}/${jobImages.length} images`);
@@ -3122,6 +3125,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: error.message || "Failed to get media" });
     }
   });
+
+  // ============== Register OpenAI Routes ==============
+  registerOpenAIRoutes(app);
+
+  // ============== Register Template AI Routes ==============
+  registerTemplateAIRoutes(app);
 
   return createServer(app);
 }

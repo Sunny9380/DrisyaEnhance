@@ -1,6 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Check, Sparkles, Upload } from "lucide-react";
 import TemplateFavorites from "./TemplateFavorites";
 
 interface TemplateCardProps {
@@ -13,6 +14,7 @@ interface TemplateCardProps {
   isFavorite?: boolean;
   onClick?: () => void;
   onToggleFavorite?: (id: string, isFavorite: boolean) => void;
+  onAIEnhance?: (templateId: string, templateName: string) => void;
 }
 
 export default function TemplateCard({
@@ -25,6 +27,7 @@ export default function TemplateCard({
   isFavorite = false,
   onClick,
   onToggleFavorite,
+  onAIEnhance,
 }: TemplateCardProps) {
   const getGradient = () => {
     if (gradient) return gradient;
@@ -91,9 +94,32 @@ export default function TemplateCard({
         <h3 className="font-semibold text-sm truncate" data-testid={`text-template-name-${id}`}>
           {name}
         </h3>
-        <Badge variant="secondary" className="mt-1 text-xs">
-          {category}
-        </Badge>
+        <div className="flex items-center justify-between mt-2">
+          <Badge variant="secondary" className="text-xs">
+            {category}
+          </Badge>
+          {onAIEnhance && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 px-2 text-xs"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAIEnhance(id, name);
+              }}
+            >
+              <Sparkles className="w-3 h-3 mr-1" />
+              AI Enhance
+            </Button>
+          )}
+        </div>
+        {name === "Dark Blue Velvet Luxury" && (
+          <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-950 rounded-md">
+            <p className="text-xs text-blue-700 dark:text-blue-300">
+              ✨ Premium velvet background with cinematic lighting
+            </p>
+          </div>
+        )}
       </div>
     </Card>
   );
