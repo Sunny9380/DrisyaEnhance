@@ -1,4 +1,3 @@
-import { huggingFaceClient } from './huggingfaceClient';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -51,33 +50,12 @@ export class JewelryAIGenerator {
       
       console.log(`🤖 AI Prompt: ${fullPrompt}`);
 
-      // Call AI service with fallback
-      const { buffer, usedFallback } = await huggingFaceClient.processWithFallback(
-        request.imageUrl,
-        fullPrompt,
-        'auto', // Use auto model selection
-        request.quality || '4k'
-      );
-
-      // Save generated image
-      const filename = `jewelry_${request.userId}_${Date.now()}.png`;
-      const outputPath = path.join(this.outputDir, filename);
+      // TODO: Integrate with GPT-Image-1 processing
+      // This should call your GPT-Image-1 scripts for jewelry enhancement
+      console.log('🚧 GPT-Image-1 integration needed here');
       
-      await fs.writeFile(outputPath, buffer);
-      
-      const imageUrl = `/uploads/generated/${filename}`;
-      const processingTime = Date.now() - startTime;
-
-      console.log(`✅ Jewelry background generated successfully in ${processingTime}ms`);
-      console.log(`💾 Saved to: ${imageUrl}`);
-
-      return {
-        success: true,
-        imageUrl,
-        usedFallback,
-        processingTime,
-        cost: this.calculateCost(request.quality, usedFallback)
-      };
+      // Placeholder - throw error to indicate this needs implementation
+      throw new Error('GPT-Image-1 integration not yet implemented. Use your command-line scripts for now.');
 
     } catch (error: any) {
       console.error('❌ Jewelry generation failed:', error.message);

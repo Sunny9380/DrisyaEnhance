@@ -1,5 +1,4 @@
 import { storage } from "../storage";
-import { huggingFaceClient } from "../services/huggingfaceClient";
 import { promises as fs } from "fs";
 import path from "path";
 
@@ -111,8 +110,8 @@ export class AIEditQueue {
       const absoluteImageUrl = this.getAbsoluteUrl(edit.inputImageUrl);
       console.log(`📸 Input image URL: ${absoluteImageUrl}`);
 
-      // 5. Call HF client with retry logic, passing quality from edit record
-      const result = await this.processWithRetry(absoluteImageUrl, edit.prompt, edit.aiModel, edit.quality || '4k');
+      // 5. Call GPT-Image-1 processing (placeholder - integrate with your GPT-Image-1 scripts)
+      const result = await this.processWithGPTImage1(absoluteImageUrl, edit.prompt, edit.aiModel, edit.quality || '4k');
 
       // 6. Upload result to storage
       const outputUrl = await this.uploadResult(result.buffer, editId);
@@ -143,89 +142,25 @@ export class AIEditQueue {
   }
 
   /**
-   * Process image with retry logic for rate limits and model loading
+   * Process image with GPT-Image-1 (placeholder for integration)
    */
-  private async processWithRetry(
+  private async processWithGPTImage1(
     imageUrl: string,
     prompt: string,
-    modelKey: string = "auto",
+    modelKey: string = "gpt-image-1",
     quality: string = "4k"
   ): Promise<{ buffer: Buffer; cost: number; usedFallback: boolean }> {
-    const rateLimitConfig: RetryConfig = { maxAttempts: 3, currentAttempt: 0 };
-    const modelLoadingConfig: RetryConfig = { maxAttempts: 2, currentAttempt: 0 };
-
-    while (rateLimitConfig.currentAttempt < rateLimitConfig.maxAttempts) {
-      try {
-        // Try HF API first
-        const buffer = await huggingFaceClient.editImage(imageUrl, prompt, modelKey);
-        
-        if (buffer) {
-          // Success - HF API worked
-          return { buffer, cost: 0, usedFallback: false };
-        }
-
-        throw new Error("No buffer returned from HF API");
-      } catch (error: any) {
-        const errorMsg = error.message || "";
-
-        // Handle RATE_LIMITED errors
-        if (errorMsg.startsWith("RATE_LIMITED:")) {
-          const retryAfter = parseInt(errorMsg.split(":")[1] || "60");
-          rateLimitConfig.currentAttempt++;
-
-          if (rateLimitConfig.currentAttempt < rateLimitConfig.maxAttempts) {
-            const waitTime = retryAfter * Math.pow(2, rateLimitConfig.currentAttempt - 1);
-            console.log(
-              `⏳ Rate limited. Waiting ${waitTime}s before retry ${rateLimitConfig.currentAttempt}/${rateLimitConfig.maxAttempts}`
-            );
-            await this.sleep(waitTime * 1000);
-            continue;
-          } else {
-            console.log("🔄 Max rate limit retries reached, trying fallback...");
-            break;
-          }
-        }
-
-        // Handle MODEL_LOADING errors
-        if (errorMsg.startsWith("MODEL_LOADING:")) {
-          const estimatedTime = parseInt(errorMsg.split(":")[1] || "20");
-          modelLoadingConfig.currentAttempt++;
-
-          if (modelLoadingConfig.currentAttempt < modelLoadingConfig.maxAttempts) {
-            console.log(
-              `🔄 Model loading. Waiting ${estimatedTime}s before retry ${modelLoadingConfig.currentAttempt}/${modelLoadingConfig.maxAttempts}`
-            );
-            await this.sleep(estimatedTime * 1000);
-            continue;
-          } else {
-            console.log("🔄 Model still loading after retries, trying fallback...");
-            break;
-          }
-        }
-
-        // Handle HF_API_ERROR - immediate fallback
-        if (errorMsg.startsWith("HF_API_ERROR:")) {
-          console.log("❌ HF API error, trying fallback...");
-          break;
-        }
-
-        // Any other error - immediate fallback
-        console.log(`⚠️ Unexpected error: ${errorMsg}, trying fallback...`);
-        break;
-      }
-    }
-
-    // Fallback to local Python service with user-selected quality
-    console.log(`🔧 Using local fallback service at ${quality} quality...`);
-    try {
-      const buffer = await huggingFaceClient.fallbackToLocal(imageUrl, prompt, quality);
-      if (!buffer) {
-        throw new Error("Local fallback returned no buffer");
-      }
-      return { buffer, cost: 0, usedFallback: true };
-    } catch (fallbackError: any) {
-      throw new Error(`Both HF API and local fallback failed: ${fallbackError.message}`);
-    }
+    // TODO: Integrate with your GPT-Image-1 scripts
+    // This is a placeholder - you should integrate with your working GPT-Image-1 scripts:
+    // - gpt-image-1-edit-earrings.js
+    // - gpt-image-1-generate-earrings.js
+    
+    console.log(`🎨 GPT-Image-1 processing: ${imageUrl}`);
+    console.log(`📝 Prompt: ${prompt}`);
+    console.log(`🤖 Model: ${modelKey}`);
+    
+    // For now, throw an error to indicate this needs implementation
+    throw new Error("GPT-Image-1 integration not yet implemented. Use your command-line scripts for now.");
   }
 
   /**
