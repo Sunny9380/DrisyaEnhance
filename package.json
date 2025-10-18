@@ -20,6 +20,7 @@
     "test:earrings": "node test-earrings-enhancement.js",
     "convert:image": "node convert-image.js",
     "enhance:earrings": "node enhance-earrings-pair.js",
+    "check:balance": "node check-openai-balance.js",
     "test:all": "npm run db:setup && npm run test:api",
     "fix:all": "npm run db:setup && npm run build && npm run test:api",
     "quick:test": "npm run build && npm run test:api"
