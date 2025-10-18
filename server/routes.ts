@@ -24,6 +24,8 @@ import { jewelryAIGenerator } from "./services/jewelryAIGenerator";
 // OpenAI-only system - removed Stability AI
 import { openaiImageEnhancer } from "./services/openaiImageEnhancer";
 import { registerOpenAIRoutes } from "./routes/openaiRoutes";
+// Template AI Enhancement System
+import { registerTemplateAIRoutes } from "./routes/templateAIRoutes";
 import { z } from "zod";
 import { pool } from "./db";
 
@@ -3126,6 +3128,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ============== Register OpenAI Routes ==============
   registerOpenAIRoutes(app);
+
+  // ============== Register Template AI Routes ==============
+  registerTemplateAIRoutes(app);
 
   return createServer(app);
 }

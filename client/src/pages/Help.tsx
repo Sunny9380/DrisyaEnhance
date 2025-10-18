@@ -174,8 +174,8 @@ export default function Help() {
 
   const filteredFaqs = faqs.filter((faq) => {
     const matchesSearch =
-      faq.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      faq.answer.toLowerCase().includes(searchQuery.toLowerCase());
+      (faq.question || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (faq.answer || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory =
       activeCategory === "all" || faq.category === activeCategory;
     return matchesSearch && matchesCategory;

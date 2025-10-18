@@ -28,7 +28,7 @@ export default function TemplateGallery({
   const categories = Array.from(new Set(templates.map((t) => t.category)));
 
   const filteredTemplates = templates.filter((template) => {
-    const matchesSearch = template.name
+    const matchesSearch = (template.name || '')
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
     const matchesCategory =

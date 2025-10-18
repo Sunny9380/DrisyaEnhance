@@ -155,7 +155,7 @@ export default function Gallery() {
       if (typeFilter !== 'all' && img.type !== typeFilter) return false;
       
       // Search by name
-      if (searchQuery && !img.originalName.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      if (searchQuery && !(img.originalName || '').toLowerCase().includes(searchQuery.toLowerCase())) return false;
       
       return true;
     });

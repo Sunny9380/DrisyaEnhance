@@ -44,7 +44,7 @@ export default function History() {
   const jobImages = imagesData?.images || [];
 
   const filteredJobs = jobs.filter((job) => {
-    const matchesSearch = job.id
+    const matchesSearch = (job.id || '')
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
     const matchesFilter = !filter || job.status === filter;

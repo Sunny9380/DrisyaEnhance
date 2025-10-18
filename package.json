@@ -12,7 +12,11 @@
     "db:generate": "drizzle-kit generate",
     "db:test": "node fix-database.js",
     "db:setup": "node setup-database.js",
+    "db:quick": "node setup-database-quick.js",
+    "db:fix": "node fix-database-tables.js",
+    "db:schema": "node fix-database-schema.js",
     "test:api": "node test-api.js",
+    "test:all-apis": "node test-all-apis.js",
     "test:all": "npm run db:setup && npm run test:api",
     "fix:all": "npm run db:setup && npm run build && npm run test:api",
     "quick:test": "npm run build && npm run test:api"
