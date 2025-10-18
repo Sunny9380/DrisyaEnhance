@@ -21,7 +21,7 @@ import { insertUserSchema, insertProcessingJobSchema, insertCoinPackageSchema, i
 import { sendWelcomeEmail, sendJobCompletedEmail, sendPaymentConfirmedEmail, sendCoinsAddedEmail, shouldSendEmail } from "./email";
 import { aiEditQueue } from "./queues/aiEditQueue";
 import { jewelryAIGenerator } from "./services/jewelryAIGenerator";
-import { aiImageEnhancer } from "./services/aiImageEnhancer";
+// OpenAI-only system - removed Stability AI
 import { openaiImageEnhancer } from "./services/openaiImageEnhancer";
 import { registerOpenAIRoutes } from "./routes/openaiRoutes";
 import { z } from "zod";

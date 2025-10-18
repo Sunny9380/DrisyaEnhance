@@ -24,10 +24,66 @@ interface OpenAIServiceResponse {
 export class OpenAIImageEnhancer {
   private apiKey: string;
   private baseUrl: string;
+  private maxRetries: number;
+  private timeout: number;
 
   constructor() {
     this.apiKey = process.env.OPENAI_API_KEY || '';
     this.baseUrl = 'https://api.openai.com/v1';
+    this.maxRetries = 3;
+    this.timeout = 120000; // 2 minutes
+  }
+
+  /**
+   * Sleep utility for rate limiting
+   */
+  private async sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Make API call with retry logic and rate limiting
+   */
+  private async makeAPICall(endpoint: string, data: any, options: any = {}): Promise<any> {
+    let retries = 0;
+    
+    while (retries < this.maxRetries) {
+      try {
+        const response = await axios({
+          method: options.method || 'POST',
+          url: `${this.baseUrl}${endpoint}`,
+          data,
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'User-Agent': 'DrisyaAI-JewelryEnhancer/1.0',
+            ...options.headers
+          },
+          timeout: this.timeout,
+          ...options
+        });
+
+        return response;
+      } catch (error: any) {
+        retries++;
+        
+        // Handle rate limiting (429 errors)
+        if (error.response?.status === 429 && retries < this.maxRetries) {
+          const retryAfter = error.response.headers['retry-after'] || Math.pow(2, retries);
+          console.log(`⏳ Rate limited. Retrying in ${retryAfter} seconds...`);
+          await this.sleep(retryAfter * 1000);
+          continue;
+        }
+        
+        // Handle server errors (5xx)
+        if (error.response?.status >= 500 && retries < this.maxRetries) {
+          console.log(`🔄 Server error. Retry ${retries}/${this.maxRetries}...`);
+          await this.sleep(1000 * retries);
+          continue;
+        }
+        
+        throw error;
+      }
+    }
   }
 
   /**
@@ -107,14 +163,20 @@ export class OpenAIImageEnhancer {
   }
 
   /**
-   * Try DALL-E 3 Image Edit API
+   * Try DALL-E 3 Image Edit API with developer mode features
    */
   private async tryDALLE3ImageEdit(options: OpenAIEnhancementOptions, prompt: string): Promise<OpenAIServiceResponse> {
     try {
-      console.log('🎨 Trying DALL-E 3 Image Edit...');
+      console.log('🎨 Trying DALL-E 3 Image Edit (Developer Mode)...');
 
-      // Read and prepare image
+      // Validate image size (max 4MB for DALL-E)
       const imageBuffer = await fs.readFile(options.inputPath);
+      if (imageBuffer.length > 4 * 1024 * 1024) {
+        return {
+          success: false,
+          error: 'Image too large. Maximum size is 4MB for DALL-E'
+        };
+      }
       
       const formData = new FormData();
       formData.append('image', imageBuffer, 'image.png');
@@ -123,17 +185,10 @@ export class OpenAIImageEnhancer {
       formData.append('size', '1024x1024');
       formData.append('response_format', 'url');
 
-      const response = await axios.post(
-        `${this.baseUrl}/images/edits`,
-        formData,
-        {
-          headers: {
-            ...formData.getHeaders(),
-            'Authorization': `Bearer ${this.apiKey}`,
-          },
-          timeout: 60000
-        }
-      );
+      // Use developer mode API call with retry logic
+      const response = await this.makeAPICall('/images/edits', formData, {
+        headers: formData.getHeaders()
+      });
 
       if (response.data.data && response.data.data.length > 0) {
         const imageUrl = response.data.data[0].url;
@@ -141,16 +196,19 @@ export class OpenAIImageEnhancer {
         // Download the generated image
         await this.downloadImage(imageUrl, options.outputPath);
         
-        console.log('✅ DALL-E 3 Image Edit successful!');
+        console.log('✅ DALL-E 3 Image Edit successful (Developer Mode)!');
         
         return {
           success: true,
           outputUrl: options.outputPath,
           metadata: {
             model: 'dall-e-3-edit',
+            method: 'image_edit',
             prompt: prompt.substring(0, 200),
             quality: options.quality,
-            size: '1024x1024'
+            size: '1024x1024',
+            cost_estimate: 0.02, // Image edit pricing
+            developer_mode: true
           }
         };
       }
@@ -161,13 +219,29 @@ export class OpenAIImageEnhancer {
       console.error('❌ DALL-E 3 Image Edit failed:', error);
       
       let errorMessage = 'DALL-E 3 Image Edit failed';
+      let suggestions: string[] = [];
+      
       if (error.response?.data?.error) {
-        errorMessage = `DALL-E 3 Edit failed: ${error.response.data.error.message}`;
+        const apiError = error.response.data.error;
+        errorMessage = `DALL-E 3 Edit failed: ${apiError.message}`;
+        
+        // Add developer mode suggestions
+        if (apiError.type === 'insufficient_quota') {
+          suggestions.push('Add more credits to your OpenAI account');
+          suggestions.push('Check billing limits at https://platform.openai.com/account/billing');
+        } else if (apiError.code === 'invalid_image_format') {
+          suggestions.push('Convert image to PNG format');
+          suggestions.push('Ensure image is under 4MB');
+        }
       }
       
       return {
         success: false,
-        error: errorMessage
+        error: errorMessage,
+        metadata: {
+          suggestions,
+          developer_mode: true
+        }
       };
     }
   }
