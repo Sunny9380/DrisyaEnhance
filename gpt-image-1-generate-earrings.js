@@ -14,7 +14,7 @@ dotenv.config();
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 async function generateEnhancedEarringsWithGPTImage1() {
-  console.log('🎨 GPT-Image-1 Enhanced Earrings Generation...');
+  console.log('🎨 GPT-Image-1 Enhanced Men\'s Bracelet Generation...');
   console.log('=' .repeat(60));
   
   if (!OPENAI_API_KEY) {
@@ -22,8 +22,8 @@ async function generateEnhancedEarringsWithGPTImage1() {
     return;
   }
 
-  // Enhanced prompt combining earrings description with your background requirements
-  const prompt = `A high-end product photograph of elegant gold spiral diamond earrings with intricate link patterns and detailed clasps. The earrings are positioned on a dark, elegant matte blue velvet or suede background with soft texture, under moody, directional lighting. Strong light beams cast realistic shadows in a criss-cross windowpane pattern, creating a dramatic and luxurious ambiance. The scene evokes a sense of evening or indoor light streaming through a window, with a focused spotlight on the product area and soft shadows to highlight depth and contrast. The environment feels premium, rich, and cinematic. Professional jewelry photography with perfect composition, sharp details, and luxury aesthetic. 1080x1080px format.`;
+  // Enhanced prompt for men's bracelet with beige-brown fabric and cream wooden background
+  const prompt = `A hyper-realistic product photograph of a luxurious men's bracelet laid diagonally across a soft beige-brown fabric background and a light cream wooden surface. The clasp is positioned at the bottom left corner of the image. A pale peach rose with soft petals is placed in the upper left corner for a decorative touch. Lighting is warm, soft, and diffused, casting gentle shadows and highlighting the metallic shine and texture of the bracelet links. Ensure the bracelet design, link pattern, clasp details, colors, and background elements remain exactly the same with no changes or alterations to composition, color, or lighting. Make a image size is 1080 X 1080px.`;
 
   console.log('🎯 Prompt:', prompt.substring(0, 100) + '...');
   console.log('🤖 Model: gpt-image-1');
@@ -31,7 +31,7 @@ async function generateEnhancedEarringsWithGPTImage1() {
   console.log('');
 
   try {
-    console.log('🔄 Generating enhanced earrings with gpt-image-1...');
+    console.log('🔄 Generating enhanced men\'s bracelet with gpt-image-1...');
     
     const startTime = Date.now();
     
@@ -62,21 +62,21 @@ async function generateEnhancedEarringsWithGPTImage1() {
 
       // Save the generated image
       if (imageData.b64_json) {
-        console.log('📥 Saving generated enhanced earrings...');
+        console.log('📥 Saving generated enhanced men\'s bracelet...');
         
         const imageBuffer = Buffer.from(imageData.b64_json, 'base64');
-        const filename = `gpt-image-1-enhanced-earrings-${Date.now()}.png`;
+        const filename = `gpt-image-1-enhanced-bracelet-${Date.now()}.png`;
         const filepath = `uploads/processed/${filename}`;
         
         // Ensure directory exists
         await fs.promises.mkdir('uploads/processed', { recursive: true });
         await fs.promises.writeFile(filepath, imageBuffer);
         
-        console.log(`✅ Enhanced earrings saved: ${filepath}`);
+        console.log(`✅ Enhanced men's bracelet saved: ${filepath}`);
         console.log(`📁 File size: ${(imageBuffer.length / 1024 / 1024).toFixed(2)} MB`);
         
         // Also save a copy with a simple name for easy access
-        const simplePath = 'gpt-image-1-blue-velvet-earrings.png';
+        const simplePath = 'gpt-image-1-beige-fabric-bracelet.png';
         await fs.promises.writeFile(simplePath, imageBuffer);
         console.log(`✅ Copy saved as: ${simplePath}`);
         
@@ -119,8 +119,8 @@ async function generateEnhancedEarringsWithGPTImage1() {
   console.log('🎉 Generation Complete!');
   console.log('=' .repeat(60));
   console.log('✅ GPT-Image-1 model working successfully');
-  console.log('🎯 Your blue velvet luxury template recreated');
-  console.log('💎 Perfect for jewelry enhancement workflow');
+  console.log('🎯 Your beige fabric luxury template created');
+  console.log('💎 Perfect for men\'s bracelet photography');
 }
 
 generateEnhancedEarringsWithGPTImage1().catch(console.error);
